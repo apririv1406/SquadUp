@@ -1,0 +1,428 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Event;
+use App\Models\Group;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
+use Carbon\Carbon;
+
+/**
+ * Gestiona la creación, edición, eliminación y asistencia a Eventos (RF1, RF3, RF4, RF6, RF13).
+ */
+class EventController extends Controller
+{
+    // Define los roles que pueden crear/editar eventos
+    protected const EVENT_MANAGEMENT_ROLES = [
+        Group::ROLE_ADMIN,
+        Group::ROLE_ORGANIZER
+    ];
+
+    /**
+     * Muestra la lista de eventos públicos para exploración.
+     * * @param \Illuminate\Http\Request $request
+     */
+    public function explore(Request $request)
+    {
+        // 1. Definir la lista de deportes fijos
+        $availableSports = [
+            'futbol' => 'Fútbol',
+            'futbol_sala' => 'Fútbol sala',
+            'baloncesto' => 'Baloncesto',
+            'balonmano' => 'Balonmano',
+            'waterpolo' => 'Waterpolo',
+            'tenis' => 'Tenis',
+            'voley' => 'Voleibol',
+            'running' => 'Running / Carrera',
+            'senderismo' => 'Senderismo',
+            'padel' => 'Pádel'
+        ];
+
+        // 2. Obtener y sanitizar todos los filtros
+
+        // Deporte
+        $currentSport = $request->input('sport');
+        if (!in_array($currentSport, $availableSports)) {
+             $currentSport = null;
+        }
+
+        // Ubicación
+        $currentLocation = trim($request->input('location'));
+        $currentLocation = empty($currentLocation) ? null : $currentLocation;
+
+        // Capacidad
+        $minCapacity = filter_var($request->input('min_capacity'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $minCapacity = $minCapacity === false ? null : $minCapacity;
+        $maxCapacity = filter_var($request->input('max_capacity'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $maxCapacity = $maxCapacity === false ? null : $maxCapacity;
+
+        // Fecha/Hora
+        $minDate = $request->input('min_date');
+        $minDate = empty($minDate) ? null : $minDate;
+        $maxDate = $request->input('max_date');
+        $maxDate = empty($maxDate) ? null : $maxDate;
+
+
+        // 3. Preparar la consulta base de eventos públicos
+        $publicEventsQuery = Event::whereHas('group', function ($query) {
+            $query->where('is_public', 1);
+        })
+        ->with(['group', 'attendees'])
+        //RESTRICCIÓN CLAVE: SOLO EVENTOS FUTUROS O ACTUALES
+        //->where('event_date', '>=', Carbon::now())
+        //ORDENAMIENTO CLAVE: POR FECHA DEL EVENTO (DESC)
+        ->orderBy('event_date', 'desc');
+
+
+        // 4. Aplicar filtros condicionales
+
+        // Filtro 4.1: Deporte
+        if ($currentSport) {
+            $publicEventsQuery->where('sport_name', $currentSport);
+        }
+
+        // Filtro 4.2: Ubicación
+        if ($currentLocation) {
+            $publicEventsQuery->where('location', 'like', '%' . $currentLocation . '%');
+        }
+
+        // Filtro 4.3: Rango de Capacidad
+        if ($minCapacity !== null && $maxCapacity !== null) {
+            $publicEventsQuery->whereBetween('capacity', [$minCapacity, $maxCapacity]);
+        } elseif ($minCapacity !== null) {
+            $publicEventsQuery->where('capacity', '>=', $minCapacity);
+        } elseif ($maxCapacity !== null) {
+            $publicEventsQuery->where('capacity', '<=', $maxCapacity);
+        }
+
+        // Filtro 4.4: Rango Horario
+        // Nota: Si el usuario filtra un rango que incluye el pasado, la restricción del paso 3 prevalece.
+        if ($minDate && $maxDate) {
+            $publicEventsQuery->whereBetween('event_date', [$minDate, $maxDate]);
+        } elseif ($minDate) {
+            $publicEventsQuery->where('event_date', '>=', $minDate);
+        } elseif ($maxDate) {
+            $publicEventsQuery->where('event_date', '<=', $maxDate);
+        }
+
+        // 5. Obtener resultados paginados
+        $events = $publicEventsQuery->paginate(12)->withQueryString();
+
+
+        // 6. Pasar TODAS las variables necesarias a la vista
+        return view('events.explore', [
+            'events' => $events,
+            'user' => Auth::user(),
+            // Variables de Filtro
+            'availableSports' => $availableSports,
+            'currentSport' => $currentSport,
+            'currentLocation' => $currentLocation,
+            'minCapacity' => $minCapacity,
+            'maxCapacity' => $maxCapacity,
+            'minDate' => $minDate,
+            'maxDate' => $maxDate,
+        ]);
+    }
+
+    /**
+     * Muestra el formulario para crear un nuevo evento (RF1).
+     *
+     * @param Request $request
+     * @return \Illuminate\View\View|\Illuminate\Http\RedirectResponse
+     */
+    public function create(Request $request)
+    {
+        $group_id = $request->input('group_id');
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        $groups = $user->groups()->get();
+
+        if ($groups->isEmpty()) {
+            return redirect()->route('groups.index')->with('error', 'Debes ser miembro de al menos un grupo para crear un evento.');
+        }
+
+        if ($group_id) {
+            $group = $groups->firstWhere('group_id', $group_id);
+            if (!$group) {
+                $group_id = null;
+            }
+        }
+
+        return view('event.create', compact('groups', 'group_id'));
+    }
+
+    /**
+     * Almacena un nuevo evento en la base de datos (RF1).
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'group_id' => ['required', 'exists:groups,group_id'],
+            'title' => ['required', 'string', 'max:150'],
+            'location' => ['nullable', 'string', 'max:255'],
+            'event_date' => ['required', 'date', 'after_or_equal:now'],
+            'sport_name' => ['required', 'string', 'max:100'],
+            'is_public' => ['boolean'],
+            'capacity' => ['nullable', 'integer', 'min:0'],
+        ]);
+
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        // --- VERIFICACIÓN DE PERMISOS CLAVE (Usando el nuevo método en User) ---
+        $isAuthorized = $user->hasRoleInGroup($validated['group_id'], self::EVENT_MANAGEMENT_ROLES);
+
+        if (!$isAuthorized) {
+            return back()->withInput()->with('error', 'No tienes permiso para crear eventos en este grupo. Solo los Organizadores o Administradores pueden hacerlo.');
+        }
+
+        // Crear el evento
+        $event = Event::create([
+            'group_id' => $validated['group_id'],
+            'title' => $validated['title'],
+            'location' => $validated['location'],
+            'event_date' => Carbon::parse($validated['event_date']),
+            'sport_name' => $validated['sport_name'],
+            'is_public' => $validated['is_public'] ?? false,
+            'capacity' => $validated['capacity'] ?? 0,
+        ]);
+
+        // Registrar la asistencia automática del creador (RF4)
+        $event->attendees()->attach($user->user_id, ['is_confirmed' => true]);
+
+        return redirect()->route('groups.show', $validated['group_id'])->with('success', 'Evento "' . $event->title . '" creado y confirmado.');
+    }
+
+    /**
+     * Muestra la vista detallada de un evento específico.
+     * @param \App\Models\Event $event La instancia del evento inyectada por Route Model Binding.
+     * @return \Illuminate\View\View
+     */
+    public function show(Event $event)
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        // Cargar las relaciones necesarias
+        $event->load(['group', 'attendees', 'expenses.payer', 'creator']);
+
+        // 1. Obtener asistentes CONFIRMADOS (is_confirmed = true)
+        // Asume que la relación 'attendees' existe y permite filtrar por la tabla pivote 'attendance'.
+        $confirmedAttendees = $event->attendees()
+                                    ->wherePivot('is_confirmed', true)
+                                    ->get();
+
+        // 2. Obtener gastos del evento
+        $expenses = $event->expenses->sum('amount'); //$event->expenses; // Asume que tienes una relación 'expenses' en el modelo Event.
+        //$totalExpenses = $event->expenses->sum('amount');
+
+                // Verificar si el usuario es miembro del grupo
+        $isGroupMember = $user->groups->contains($event->group_id);
+
+        if (!$isGroupMember && !$event->is_public) {
+            return redirect()->route('groups.index')->with('error', 'Acceso denegado. El evento no es público y no eres miembro del grupo.');
+        }
+
+        // Determinar el estado de asistencia del usuario
+        $isAttending = $event->attendees->contains($user->user_id);
+
+        // Determinar el permiso de organizador/administrador para la vista
+        $isOrganizer = $user->hasRoleInGroup($event->group_id, self::EVENT_MANAGEMENT_ROLES);
+
+        // 3. Pasar las variables a la vista
+        return view('events.show', [
+            'event' => $event,
+            'confirmedAttendees' => $confirmedAttendees,
+            'expenses' => $expenses,
+            'isAttending' => $isAttending,
+            'isOrganizer' => $isOrganizer,
+        ]);
+    }
+
+    /**
+     * Actualiza la asistencia del usuario a un evento (RF4).
+     *
+     * @param  \App\Models\Event  $event
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function toggleAttendance(Event $event, Request $request)
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        $currentAttendance = $event->attendees()->where('user_id', $user->user_id)->exists();
+
+        if ($currentAttendance) {
+            // Desconfirmar / Salir del evento
+            $event->attendees()->detach($user->user_id);
+            $message = 'Has cancelado tu asistencia al evento.';
+        } else {
+            // Confirmar asistencia
+            if ($event->capacity > 0 && $event->attendees()->count() >= $event->capacity) {
+                return back()->with('error', 'Lo sentimos, el evento ha alcanzado su capacidad máxima.');
+            }
+
+            $event->attendees()->attach($user->user_id, ['is_confirmed' => true]);
+            $message = '¡Asistencia confirmada!';
+        }
+
+        return back()->with('success', $message);
+    }
+
+    /**
+     * Muestra el formulario para editar un evento (RF1).
+     *
+     * @param  \App\Models\Event  $event
+     * @return \Illuminate\View\View|\Illuminate\Http\RedirectResponse
+     */
+    public function edit(Event $event)
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        // --- VERIFICACIÓN DE PERMISOS CLAVE ---
+        $isAuthorized = $user->hasRoleInGroup($event->group_id, self::EVENT_MANAGEMENT_ROLES);
+
+        if (!$isAuthorized) {
+            return back()->with('error', 'No tienes permiso para editar este evento.');
+        }
+
+        // Lista de deportes disponibles para el desplegable
+        $sportsList = [
+            'futbol' => 'Fútbol',
+            'futbol_sala' => 'Fútbol sala',
+            'baloncesto' => 'Baloncesto',
+            'balonmano' => 'Balonmano',
+            'waterpolo' => 'Waterpolo',
+            'tenis' => 'Tenis',
+            'voley' => 'Voleibol',
+            'running' => 'Running / Carrera',
+            'senderismo' => 'Senderismo',
+            'padel' => 'Pádel'
+        ];
+
+        // Se pasa el evento y la lista de deportes a la vista
+        return view('events.edit', compact('event', 'sportsList'));
+    }
+
+    /**
+     * Actualiza un evento en la base de datos (RF1).
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \App\Models\Event  $event
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function update(Request $request, Event $event)
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        // --- VERIFICACIÓN DE PERMISOS CLAVE ---
+        $isAuthorized = $user->hasRoleInGroup($event->group_id, self::EVENT_MANAGEMENT_ROLES);
+
+        if (!$isAuthorized) {
+            return back()->with('error', 'No tienes permiso para actualizar este evento.');
+        }
+
+        // Reglas de validación
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:150'],
+            'location' => ['nullable', 'string', 'max:255'],
+            'event_date' => ['required', 'date', 'after_or_equal:now'],
+            'sport_name' => ['required', 'string', 'max:100'],
+            'is_public' => ['nullable', 'boolean'],
+            'capacity' => ['nullable', 'integer', 'min:0'],
+        ]);
+
+        // Actualización del evento
+        $event->update([
+            'title' => $validated['title'],
+            'location' => $validated['location'],
+            'event_date' => Carbon::parse($validated['event_date']),
+            'sport_name' => $validated['sport_name'],
+            'is_public' => $request->has('is_public'), // Asegura que se almacene 'false' si no se marca
+            'capacity' => $validated['capacity'] ?? 0,
+        ]);
+
+        return redirect()->route('event.show', $event)->with('success', 'Evento actualizado correctamente.');
+    }
+
+    /**
+     * Elimina un evento de la base de datos (RF1).
+     *
+     * @param  \App\Models\Event  $event
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function destroy(Event $event)
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        // --- VERIFICACIÓN DE PERMISOS CLAVE ---
+        $isAuthorized = $user->hasRoleInGroup($event->group_id, self::EVENT_MANAGEMENT_ROLES);
+
+        if (!$isAuthorized) {
+            return back()->with('error', 'No tienes permiso para eliminar este evento.');
+        }
+
+        $eventTitle = $event->title;
+        $groupId = $event->group_id; // Obtenemos el ID del grupo para redirigir
+        $event->delete();
+
+        return redirect()->route('groups.show', $groupId)->with('success', 'Evento "' . $eventTitle . '" eliminado correctamente.');
+    }
+
+    // =======================================================
+    // MÉTODOS DE ASISTENCIA (JOIN/LEAVE)
+    // =======================================================
+
+    /**
+     * El usuario autenticado se une al evento (crea un registro de asistencia).
+     *
+     * @param  \App\Models\Event  $event
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function join(Event $event)
+    {
+        $userId = Auth::id();
+
+        // Verificar si el usuario ya está asistiendo para evitar duplicados
+        if ($event->attendees()->where('attendance.user_id', $userId)->exists()) {
+            return response()->json(['message' => 'Ya estás asistiendo a este evento.'], 409); // 409 Conflict
+        }
+
+        // Adjuntar el ID del usuario a la relación 'attendees' (tabla pivote)
+        // Esto creará un nuevo registro en la tabla 'attendance'
+        $event->attendees()->attach($userId);
+
+        return response()->json(['message' => 'Te has unido al evento con éxito.']);
+    }
+
+    /**
+     * El usuario autenticado abandona el evento (elimina el registro de asistencia).
+     *
+     * @param  \App\Models\Event  $event
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function leave(Event $event)
+    {
+        $userId = Auth::id();
+
+        // Verificar si el usuario está asistiendo para poder retirarse
+        if (!$event->attendees()->where('attendance.user_id', $userId)->exists()) {
+            return response()->json(['message' => 'No estás asistiendo a este evento.'], 404); // 404 Not Found
+        }
+
+        // Desvincular el ID del usuario de la relación 'attendees'
+        // Esto eliminará el registro de la tabla 'attendance'
+        $event->attendees()->detach($userId);
+
+        return response()->json(['message' => 'Has abandonado el evento con éxito.']);
+    }
+}
