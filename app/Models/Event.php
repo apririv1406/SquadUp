@@ -15,7 +15,7 @@ use App\Models\Expense;
 class Event extends Model
 {
     public $timestamps = false;
-    
+
     use HasFactory;
 
     /**
@@ -81,7 +81,6 @@ class Event extends Model
 
     /**
      * Los registros de asistencia (pivote) para este evento.
-     * ESTO SOLUCIONA EL ERROR: Call to undefined relationship [attendance]
      */
     public function attendance(): HasMany
     {
@@ -93,8 +92,11 @@ class Event extends Model
      */
     public function attendees(): BelongsToMany
     {
-        return $this->belongsToMany(User::class, 'attendance', 'event_id', 'user_id')
-                    ->using(Attendance::class) // Usa el modelo pivote
-                    ->withPivot('is_confirmed', 'confirmation_date'); // Carga los campos extra
+        return $this->belongsToMany(
+            User::class,
+            'attendance',     // nombre de la tabla pivot
+            'event_id',       // FK en pivot hacia events
+            'user_id'         // FK en pivot hacia users
+        )->withPivot('is_confirmed', 'confirmation_date');
     }
 }

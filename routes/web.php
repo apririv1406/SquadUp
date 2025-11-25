@@ -65,6 +65,8 @@ Route::middleware('auth')->group(function () {
     // Elimina el evento
     Route::delete('/events/{event}', [EventController::class, 'destroy'])->name('event.destroy');
 
+    Route::post('/events/{event}/settle', [EventController::class, 'settle'])->name('event.settle');
+
     // 3. Rutas de Grupos (RF2, RF14)
     Route::prefix('groups')->group(function () {
         Route::get('/', [GroupController::class, 'index'])->name('groups.index'); // Añadido para el botón "Mis Grupos"

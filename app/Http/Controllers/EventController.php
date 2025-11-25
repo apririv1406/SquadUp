@@ -7,6 +7,7 @@ use App\Models\Group;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 /**
@@ -45,7 +46,7 @@ class EventController extends Controller
         // Deporte
         $currentSport = $request->input('sport');
         if (!in_array($currentSport, $availableSports)) {
-             $currentSport = null;
+            $currentSport = null;
         }
 
         // Ubicación
@@ -69,11 +70,11 @@ class EventController extends Controller
         $publicEventsQuery = Event::whereHas('group', function ($query) {
             $query->where('is_public', 1);
         })
-        ->with(['group', 'attendees'])
-        //RESTRICCIÓN CLAVE: SOLO EVENTOS FUTUROS O ACTUALES
-        //->where('event_date', '>=', Carbon::now())
-        //ORDENAMIENTO CLAVE: POR FECHA DEL EVENTO (DESC)
-        ->orderBy('event_date', 'desc');
+            ->with(['group', 'attendees'])
+            //RESTRICCIÓN CLAVE: SOLO EVENTOS FUTUROS O ACTUALES
+            //->where('event_date', '>=', Carbon::now())
+            //ORDENAMIENTO CLAVE: POR FECHA DEL EVENTO (DESC)
+            ->orderBy('event_date', 'desc');
 
 
         // 4. Aplicar filtros condicionales
@@ -212,38 +213,72 @@ class EventController extends Controller
         $event->load(['group', 'attendees', 'expenses.payer', 'creator']);
 
         // 1. Obtener asistentes CONFIRMADOS (is_confirmed = true)
-        // Asume que la relación 'attendees' existe y permite filtrar por la tabla pivote 'attendance'.
         $confirmedAttendees = $event->attendees()
-                                    ->wherePivot('is_confirmed', true)
-                                    ->get();
+            ->wherePivot('is_confirmed', true)
+            ->get();
 
-        // 2. Obtener gastos del evento
-        $expenses = $event->expenses->sum('amount'); //$event->expenses; // Asume que tienes una relación 'expenses' en el modelo Event.
-        //$totalExpenses = $event->expenses->sum('amount');
+        // 2. Obtener gastos del evento (modelos Eloquent con payer)
+        $eventExpenses = $event->expenses()->with('payer')->orderBy('created_at', 'desc')->get();
+        $totalExpenses = (float) $eventExpenses->sum('amount');
 
-                // Verificar si el usuario es miembro del grupo
+        // 3. Verificar si el usuario es miembro del grupo
         $isGroupMember = $user->groups->contains($event->group_id);
 
-        if (!$isGroupMember && !$event->is_public) {
+        if (! $isGroupMember && ! $event->is_public) {
             return redirect()->route('groups.index')->with('error', 'Acceso denegado. El evento no es público y no eres miembro del grupo.');
         }
 
-        // Determinar el estado de asistencia del usuario
-        $isAttending = $event->attendees->contains($user->user_id);
+        // 4. Determinar el estado de asistencia del usuario (usar confirmedAttendees para consistencia)
+        $isAttending = $confirmedAttendees->contains('user_id', $user->user_id);
 
-        // Determinar el permiso de organizador/administrador para la vista
+        // 5. Determinar el permiso de organizador/administrador para la vista
         $isOrganizer = $user->hasRoleInGroup($event->group_id, self::EVENT_MANAGEMENT_ROLES);
 
-        // 3. Pasar las variables a la vista
+        // 6. Preparar balances y liquidaciones
+        // Número de participantes que comparten los gastos (los confirmados)
+        $participantCount = max(1, $confirmedAttendees->count());
+
+        // 6.1. Cuánto ha pagado cada usuario (sumando por payer_id)
+        $paidPerUser = $eventExpenses
+            ->groupBy('payer_id')
+            ->map(fn($group) => (float) $group->sum('amount'));
+
+        // Asegurar que todos los confirmados aparecen en el mapa (aunque no hayan pagado)
+        $paidPerUser = $confirmedAttendees->pluck('user_id')
+            ->mapWithKeys(fn($id) => [$id => $paidPerUser->get($id, 0.0)]);
+
+        // 6.2. Parte que le corresponde a cada uno
+        $sharePerPerson = $participantCount > 0 ? round($totalExpenses / $participantCount, 2) : 0.0;
+
+        // 6.3. Construir balances: positivo = acreedor (le deben), negativo = deudor (debe)
+        $balances = $confirmedAttendees->map(function ($u) use ($paidPerUser, $sharePerPerson) {
+            $paid = (float) ($paidPerUser->get($u->user_id, 0.0) ?? 0.0);
+            $balance = round($paid - $sharePerPerson, 2);
+            return (object) [
+                'user_id' => $u->user_id,
+                'name' => $u->name,
+                'paid' => $paid,
+                'share' => round($sharePerPerson, 2),
+                'balance' => $balance,
+            ];
+        })->values();
+
+        // 6.4. Generar lista de liquidación (pares deudor -> acreedor : cantidad)
+        $settlements = $this->computeSettlements($balances);
+
+        // 7. Pasar las variables a la vista
         return view('events.show', [
             'event' => $event,
             'confirmedAttendees' => $confirmedAttendees,
-            'expenses' => $expenses,
+            'expenses' => $totalExpenses, // compatibilidad con variable previa
             'isAttending' => $isAttending,
             'isOrganizer' => $isOrganizer,
+            'eventExpenses' => $eventExpenses,
+            'totalExpenses' => $totalExpenses,
+            'balances' => $balances,
+            'settlements' => $settlements,
         ]);
     }
-
     /**
      * Actualiza la asistencia del usuario a un evento (RF4).
      *
@@ -253,22 +288,23 @@ class EventController extends Controller
      */
     public function toggleAttendance(Event $event, Request $request)
     {
-        /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        $currentAttendance = $event->attendees()->where('user_id', $user->user_id)->exists();
+        $isAttending = $event->attendees()->wherePivot('is_confirmed', true)->where('user_id', $user->user_id)->exists();
 
-        if ($currentAttendance) {
-            // Desconfirmar / Salir del evento
+        if ($isAttending) {
             $event->attendees()->detach($user->user_id);
             $message = 'Has cancelado tu asistencia al evento.';
         } else {
-            // Confirmar asistencia
-            if ($event->capacity > 0 && $event->attendees()->count() >= $event->capacity) {
+            $attendeesCount = $event->attendees()->wherePivot('is_confirmed', true)->count();
+            if ($event->capacity > 0 && $attendeesCount >= $event->capacity) {
                 return back()->with('error', 'Lo sentimos, el evento ha alcanzado su capacidad máxima.');
             }
 
-            $event->attendees()->attach($user->user_id, ['is_confirmed' => true]);
+            $event->attendees()->attach($user->user_id, [
+                'is_confirmed' => true,
+                'confirmation_date' => now(),
+            ]);
             $message = '¡Asistencia confirmada!';
         }
 
@@ -410,19 +446,80 @@ class EventController extends Controller
      * @param  \App\Models\Event  $event
      * @return \Illuminate\Http\JsonResponse
      */
-    public function leave(Event $event)
+    public function leave(Request $request, \App\Models\Event $event)
     {
-        $userId = Auth::id();
-
-        // Verificar si el usuario está asistiendo para poder retirarse
-        if (!$event->attendees()->where('attendance.user_id', $userId)->exists()) {
-            return response()->json(['message' => 'No estás asistiendo a este evento.'], 404); // 404 Not Found
+        $user = $request->user();
+        if (! $user) {
+            return response()->json(['message' => 'No autenticado'], 401);
         }
 
-        // Desvincular el ID del usuario de la relación 'attendees'
-        // Esto eliminará el registro de la tabla 'attendance'
+        $userId = $user->user_id ?? $user->id;
+        $userId = (int) $userId;
+
+        // LOG para depuración: tipos y valores antes de detach
+        Log::debug('Leave: detaching user from event', [
+            'event_id' => $event->event_id ?? $event->id,
+            'user_id' => $userId,
+            'type_user_id' => gettype($userId),
+        ]);
+
+        // detach acepta int o array de ints
         $event->attendees()->detach($userId);
 
-        return response()->json(['message' => 'Has abandonado el evento con éxito.']);
+        return response()->json(['attending' => false, 'user_id' => $userId]);
+    }
+
+    // =======================================================
+    // MÉTODOS DE LIQUIDACION
+    // =======================================================
+
+
+    /**
+     * Genera pares de liquidación: [{from_id, from_name, to_id, to_name, amount}, ...]
+     * Recibe balances: collection de objetos con user_id, name, balance (float)
+     */
+    protected function computeSettlements($balances)
+    {
+        // separar acreedores y deudores
+        $creditors = $balances->filter(fn($b) => $b->balance > 0)
+            ->map(fn($b) => ['id' => $b->user_id, 'name' => $b->name, 'amount' => $b->balance])
+            ->values()
+            ->toArray();
+
+        $debtors = $balances->filter(fn($b) => $b->balance < 0)
+            ->map(fn($b) => ['id' => $b->user_id, 'name' => $b->name, 'amount' => abs($b->balance)])
+            ->values()
+            ->toArray();
+
+        $i = 0;
+        $j = 0;
+        $settlements = [];
+
+        while ($i < count($debtors) && $j < count($creditors)) {
+            $debt = $debtors[$i];
+            $cred = $creditors[$j];
+
+            $amount = min($debt['amount'], $cred['amount']);
+            $amount = round($amount, 2);
+
+            if ($amount > 0) {
+                $settlements[] = [
+                    'from_id' => $debt['id'],
+                    'from_name' => $debt['name'],
+                    'to_id' => $cred['id'],
+                    'to_name' => $cred['name'],
+                    'amount' => $amount,
+                ];
+
+                // restar cantidades
+                $debtors[$i]['amount'] = round($debtors[$i]['amount'] - $amount, 2);
+                $creditors[$j]['amount'] = round($creditors[$j]['amount'] - $amount, 2);
+            }
+
+            if ($debtors[$i]['amount'] <= 0.001) $i++;
+            if ($creditors[$j]['amount'] <= 0.001) $j++;
+        }
+
+        return $settlements;
     }
 }

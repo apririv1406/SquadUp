@@ -14,11 +14,13 @@ class Attendance extends Pivot
 {
     // Nombre de la tabla pivote
     protected $table = 'attendance';
+    public $timestamps = false;
 
     // Las claves primarias son compuestas (user_id y event_id)
     // No tiene clave primaria incremental
-    protected $primaryKey = null;
+    protected $primaryKey = ['user_id', 'event_id'];
     public $incrementing = false;
+
 
     /**
      * The attributes that are mass assignable.
@@ -60,5 +62,19 @@ class Attendance extends Pivot
     public function event(): BelongsTo
     {
         return $this->belongsTo(Event::class, 'event_id', 'event_id');
+    }
+
+
+    public function confirm()
+    {
+        $this->is_confirmed = true;
+        $this->confirmation_date = now();
+        $this->save();
+    }
+
+    public function cancel()
+    {
+        $this->is_confirmed = false;
+        $this->save();
     }
 }
