@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Event;
 use App\Models\Group;
+use App\Models\Expense;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -424,20 +425,26 @@ class EventController extends Controller
      * @param  \App\Models\Event  $event
      * @return \Illuminate\Http\JsonResponse
      */
-    public function join(Event $event)
+    public function join(Request $request, Event $event)
     {
-        $userId = Auth::id();
-
-        // Verificar si el usuario ya está asistiendo para evitar duplicados
-        if ($event->attendees()->where('attendance.user_id', $userId)->exists()) {
-            return response()->json(['message' => 'Ya estás asistiendo a este evento.'], 409); // 409 Conflict
+        $user = $request->user();
+        if (! $user) {
+            return response()->json(['message' => 'No autenticado'], 401);
         }
 
-        // Adjuntar el ID del usuario a la relación 'attendees' (tabla pivote)
-        // Esto creará un nuevo registro en la tabla 'attendance'
-        $event->attendees()->attach($userId);
+        $id = $user->user_id ?? $user->id;
 
-        return response()->json(['message' => 'Te has unido al evento con éxito.']);
+        if (! $event->attendees()->where('attendance.user_id', $id)->exists()) {
+            $event->attendees()->attach($id, [
+                'is_confirmed' => 1,
+                'confirmation_date' => now(),
+            ]);
+        }
+
+        return response()->json([
+            'attending' => true,
+            'attendeeCount' => $event->attendees()->count(),
+        ]);
     }
 
     /**
@@ -521,5 +528,30 @@ class EventController extends Controller
         }
 
         return $settlements;
+    }
+
+    public function settle(Request $request, $eventId, $expenseId)
+    {
+        $expense = Expense::findOrFail($expenseId);
+        $user = $request->user();
+
+        // Comprobar que el gasto pertenece al evento
+        if ($expense->event_id != $eventId) {
+            return redirect()->route('event.show', $eventId)
+                ->with('error', 'El gasto no pertenece a este evento.');
+        }
+
+        // Solo el creador del gasto puede liquidarlo
+        if ($expense->payer_id != $user->id) {
+            return redirect()->route('event.show', $eventId)
+                ->with('error', 'Solo el creador puede liquidar este gasto.');
+        }
+
+        // Marcar como liquidado
+        $expense->settled = true;
+        $expense->save();
+
+        return redirect()->route('event.show', $eventId)
+            ->with('success', 'El gasto ha sido liquidado.');
     }
 }

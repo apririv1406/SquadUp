@@ -197,6 +197,19 @@
         </div>
     </div>
 
+    @if(session('success'))
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        {{ session('success') }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+    </div>
+    @endif
+
+    @if(session('error'))
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        {{ session('error') }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+    </div>
+    @endif
     {{-- Gastos y liquidación --}}
     <div class="row">
         <div class="col-lg-12 mb-4">
@@ -223,6 +236,7 @@
                                     <th>Descripción</th>
                                     <th class="text-end">Cantidad (€)</th>
                                     <th class="text-muted small">Fecha</th>
+                                    <th class="text-center">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody id="expenses-list-body">
@@ -240,6 +254,27 @@
                                     {{-- created_at debe ser instancia de Carbon; si no, usar Carbon::parse --}}
                                     <td class="text-muted small">
                                         {{ optional($exp->created_at)->format('d M Y H:i') ?? \Carbon\Carbon::parse($exp->created_at)->format('d M Y H:i') }}
+                                    </td>
+                                    <td class="text-center">
+                                        @if($exp->settled)
+                                        {{-- Si está liquidado, mostrar distintivo y deshabilitar acciones --}}
+                                        <span class="badge bg-success">Liquidado</span>
+                                        @else
+                                        {{-- Solo permitir eliminar si no está liquidado y el usuario es el creador u organizador --}}
+                                        @if(Auth::id() == $exp->payer_id || $isOrganizer)
+                                        <form action="{{ route('event.expense.destroy', [$event->event_id, $exp->expense_id]) }}" method="POST" style="display:inline;">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="button"
+                                                class="btn btn-sm btn-danger rounded-pill"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#confirmDeleteExpenseModal"
+                                                data-action="{{ route('event.expense.destroy', [$event->event_id, $exp->expense_id]) }}">
+                                                <i class="bi bi-trash"></i> Eliminar
+                                            </button>
+                                        </form>
+                                        @endif
+                                        @endif
                                     </td>
                                 </tr>
                                 @empty
@@ -280,92 +315,99 @@
                     <h2 class="h4 fw-bold text-dark border-bottom pb-2 mb-3">
                         <i class="bi bi-wallet-fill me-2 custom-text-green"></i> Liquidación y Saldos
                     </h2>
-                            {{-- Resumen de balances por usuario --}}
-                            <div class="mb-3">
-                                <h3 class="h6 fw-bold">Saldos por participante</h3>
-                                <div class="list-group">
-                                    @foreach($balances as $b)
-                                    <div class="list-group-item d-flex justify-content-between align-items-center">
-                                        <div>
-                                            <strong>{{ $b->name }}</strong>
-                                            <div class="small text-muted">Pagado: {{ number_format($b->paid, 2) }} € · Parte: {{ number_format($b->share, 2) }} €</div>
-                                        </div>
-                                        <div class="fw-bold">
-                                            @if($b->balance > 0)
-                                            <span class="text-success">+{{ number_format($b->balance, 2) }} €</span>
-                                            @elseif($b->balance < 0)
-                                                <span class="text-danger">-{{ number_format(abs($b->balance), 2) }} €</span>
-                                                @else
-                                                <span class="text-muted">0.00 €</span>
-                                                @endif
-                                        </div>
-                                    </div>
-                                    @endforeach
+
+                    {{-- Lista de liquidación sugerida --}}
+                    <div class="mt-4">
+                        <h3 class="h6 fw-bold">Quién debe a quién</h3>
+
+                        @if(count($settlements) === 0)
+                        <p class="text-muted">No hay movimientos necesarios. Todos están equilibrados.</p>
+                        @else
+                        <ul class="list-group" id="settlements-list">
+                            @foreach($settlements as $s)
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong class="text-danger">{{ $s['from_name'] }}</strong>
+                                    <span class="small text-muted"> debe a </span>
+                                    <strong class="text-success">{{ $s['to_name'] }}</strong>
                                 </div>
-                            </div>
+                                <div class="fw-bold">-{{ number_format($s['amount'], 2) }} €</div>
+                            </li>
+                            @endforeach
+                        </ul>
+                        @endif
+                    </div>
 
-                            {{-- Lista de liquidación sugerida --}}
-                            <div class="mt-4">
-                                <h3 class="h6 fw-bold">Quién debe a quién</h3>
-
-                                @if(count($settlements) === 0)
-                                <p class="text-muted">No hay movimientos necesarios. Todos están equilibrados.</p>
-                                @else
-                                <ul class="list-group" id="settlements-list">
-                                    @foreach($settlements as $s)
-                                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                                        <div>
-                                            <strong class="text-danger">{{ $s['from_name'] }}</strong>
-                                            <span class="small text-muted"> debe a </span>
-                                            <strong class="text-success">{{ $s['to_name'] }}</strong>
-                                        </div>
-                                        <div class="fw-bold">-{{ number_format($s['amount'], 2) }} €</div>
-                                    </li>
+                    {{-- Lista de gastos con opción de liquidar individualmente --}}
+                    <div class="mt-4">
+                        <h3 class="h6 fw-bold">Gastos individuales</h3>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Pagado por</th>
+                                        <th>Descripción</th>
+                                        <th class="text-end">Cantidad (€)</th>
+                                        <th class="text-center">Estado</th>
+                                        <th class="text-center">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($eventExpenses as $exp)
+                                    <tr @if($exp->settled) class="table-secondary text-decoration-line-through" @endif>
+                                        <td>{{ $exp->payer->name }}</td>
+                                        <td>{{ $exp->description }}</td>
+                                        <td class="text-end">{{ number_format($exp->amount, 2) }} €</td>
+                                        <td class="text-center">
+                                            @if($exp->settled)
+                                            <span class="badge bg-success">Liquidado</span>
+                                            @else
+                                            <span class="badge bg-warning">Pendiente</span>
+                                            @endif
+                                        </td>
+                                        <td class="text-center">
+                                            @if(Auth::id() == $exp->payer_id && !$exp->settled)
+                                            <form action="{{ route('event.expense.settle', [$event->event_id, $exp->expense_id]) }}" method="POST" style="display:inline;">
+                                                @csrf
+                                                <button type="submit" class="btn btn-sm btn-warning rounded-pill">
+                                                    <i class="bi bi-check2-circle"></i> Liquidar
+                                                </button>
+                                            </form>
+                                            @endif
+                                        </td>
+                                    </tr>
                                     @endforeach
-                                </ul>
-                                @endif
-                            </div>
-
-                            {{-- Acción: abrir modal de confirmación de liquidación --}}
-                            <div class="mt-4">
-                                <button id="open-settlement-modal" type="button" class="btn btn-outline-primary w-100 fw-bold rounded-pill"
-                                    data-bs-toggle="modal" data-bs-target="#settlementModal">
-                                    <i class="bi bi-cash-stack me-1"></i> Marcar Liquidación como Realizada
-                                </button>
-                            </div>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
 
-                    {{-- Modal de confirmación (simple) --}}
-                    <div class="modal fade" id="settlementModal" tabindex="-1" aria-labelledby="settlementModalLabel" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered">
-                            <div class="modal-content">
-                                <div class="modal-header">
-                                    <h5 class="modal-title fw-bold" id="settlementModalLabel">Confirmar Liquidación</h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-                                </div>
-                                <div class="modal-body">
-                                    <p class="mb-0">¿Deseas marcar estas operaciones como realizadas? Esto solo registrará que la liquidación se ha completado en el sistema; no procesa pagos.</p>
-                                    <ul class="mt-3 small text-muted">
-                                        <li>Se registrará la fecha de liquidación y se podrá añadir un comprobante manualmente si lo deseas.</li>
-                                        <li>Si prefieres, puedes ejecutar cada pago fuera de la app y luego marcarlo como pagado.</li>
-                                    </ul>
-                                </div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-outline-secondary rounded-pill" data-bs-dismiss="modal">Cancelar</button>
-                                    <form id="confirm-settlement-form" method="POST" action="{{ route('event.settle', $event) }}">
-                                        @csrf
-                                        <button type="submit" class="btn btn-custom-green rounded-pill">Marcar como Liquidado</button>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
         @endif
+
+        {{-- Modal de confirmación (simple) --}}
+        <div class="modal fade" id="settlementModal" tabindex="-1" aria-labelledby="settlementModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title fw-bold" id="settlementModalLabel">Confirmar Liquidación</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-0">¿Deseas marcar estas operaciones como realizadas? Esto solo registrará que la liquidación se ha completado en el sistema; no procesa pagos.</p>
+                        <ul class="mt-3 small text-muted">
+                            <li>Se registrará la fecha de liquidación y se podrá añadir un comprobante manualmente si lo deseas.</li>
+                            <li>Si prefieres, puedes ejecutar cada pago fuera de la app y luego marcarlo como pagado.</li>
+                        </ul>
+                    </div>
+
+                </div>
+            </div>
+        </div>
     </div>
+</div>
 </div>
 
 
@@ -385,7 +427,12 @@
                     <div class="mb-3">
                         <label for="payer_id" class="form-label fw-bold">Pagado por:</label>
                         <select class="form-select" id="payer_id" name="payer_id" required>
-                            {{-- Se rellenará via JS con los asistentes --}}
+                            @foreach($confirmedAttendees as $attendee)
+                            <option value="{{ $attendee->user_id }}"
+                                @if($attendee->user_id == Auth::id()) selected @endif>
+                                {{ $attendee->name }}
+                            </option>
+                            @endforeach
                         </select>
                         <div class="form-text">Selecciona al participante que hizo el pago.</div>
                     </div>
@@ -431,30 +478,52 @@
     </div>
 </div>
 
+{{-- Modal: Confirmar eliminación de gasto --}}
+<div class="modal fade" id="confirmDeleteExpenseModal" tabindex="-1" aria-labelledby="confirmDeleteExpenseLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title fw-bold" id="confirmDeleteExpenseLabel">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i> Confirmar eliminación
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                ¿Estás seguro de que quieres eliminar este gasto?
+                <span class="text-muted d-block mt-2">Esta acción no se puede deshacer.</span>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary rounded-pill" data-bs-dismiss="modal">Cancelar</button>
+                <form id="deleteExpenseForm" method="POST" class="d-inline">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="btn btn-danger rounded-pill">
+                        <i class="bi bi-trash me-1"></i> Sí, eliminar
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+
 {{-- Inyección de datos JSON (no ejecutable) --}}
 @php
-$attendeesData = $confirmedAttendees
-->map(fn($a) => ['id' => $a->user_id, 'name' => $a->name])
-->values()
-->toArray();
-
 $eventData = [
-'eventId' => $event->event_id ?? null,
+'eventId' => $event->event_id,
 'isAttending' => (bool) $isAttending,
 'attendeeCount' => $confirmedAttendees->count(),
 'currentUserId' => Auth::id(),
 'userName' => Auth::user()->name ?? 'Tú',
 'eventTitle' => $event->title ?? 'este evento',
-'attendees' => $attendeesData,
 'csrfToken' => csrf_token(),
 ];
 @endphp
 
 <script type="application/json" id="event-data-json">
-    {
-        !!json_encode($eventData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) !!
-    }
+    @json($eventData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
 </script>
+
 
 @vite('resources/js/app.js')
 

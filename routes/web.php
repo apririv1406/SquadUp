@@ -53,6 +53,8 @@ Route::middleware('auth')->group(function () {
 
     // Registro de Gasto (RF5)
     Route::post('/events/{event}/expense', [ExpenseController::class, 'store'])->name('event.store_expense');
+    // Eliminar gasto
+    Route::delete('/events/{event}/expense/{expense}', [ExpenseController::class, 'destroy'])->name('event.expense.destroy');
 
     // Acción para unirse a un evento público
     Route::post('/events/{event}/join', [EventController::class, 'join'])->name('event.join');
@@ -64,8 +66,9 @@ Route::middleware('auth')->group(function () {
     Route::put('/events/{event}', [EventController::class, 'update'])->name('event.update');
     // Elimina el evento
     Route::delete('/events/{event}', [EventController::class, 'destroy'])->name('event.destroy');
-
-    Route::post('/events/{event}/settle', [EventController::class, 'settle'])->name('event.settle');
+    // liquida un gasto
+    Route::post('/events/{event}/expense/{expense}/settle', [ExpenseController::class, 'settle'])
+        ->name('event.expense.settle');
 
     // 3. Rutas de Grupos (RF2, RF14)
     Route::prefix('groups')->group(function () {
@@ -87,4 +90,4 @@ Route::middleware('auth')->group(function () {
 });
 
 
-require __DIR__.'/auth.php';
+require __DIR__ . '/auth.php';

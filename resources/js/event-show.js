@@ -20,7 +20,12 @@
             : [];
         const csrfToken = window.EventData.csrfToken || "";
 
-        const button = document.getElementById("attendance-button");
+        const buttonAttendance = document.getElementById("attendance-button");
+
+        if (buttonAttendance) {
+            buttonAttendance.addEventListener("click", toggleAttendance);
+        }
+
         const countDisplay = document.getElementById("attendees-count");
         const countDisplayParticipants = document.getElementById(
             "attendees-count-participants"
@@ -53,6 +58,17 @@
         );
         const expenseFormAlert = document.getElementById("expense-form-alert");
 
+        const deleteModal = document.getElementById(
+            "confirmDeleteExpenseModal"
+        );
+        const deleteForm = document.getElementById("deleteExpenseForm");
+
+        deleteModal.addEventListener("show.bs.modal", function (event) {
+            const buttonDelete = event.relatedTarget;
+            const action = buttonDelete.getAttribute("data-action");
+            deleteForm.setAttribute("action", action);
+        });
+
         // Utilidades
         function setProcessing(btn, text) {
             if (!btn) return;
@@ -84,19 +100,19 @@
 
         function updateUI(attending) {
             isAttending = attending;
-            if (button) {
-                button.classList.remove(
+            if (buttonAttendance) {
+                buttonAttendance.classList.remove(
                     "btn-custom-green",
                     "btn-custom-red",
                     "btn-warning"
                 );
-                button.classList.add(
+                buttonAttendance.classList.add(
                     attending ? "btn-custom-red" : "btn-custom-green"
                 );
                 const desired = attending
                     ? '<i class="bi bi-x-circle me-1"></i> Salir del Evento'
                     : '<i class="bi bi-person-add me-1"></i> Confirmar asistencia';
-                if (button.innerHTML !== desired) button.innerHTML = desired;
+                if (buttonAttendance.innerHTML !== desired) buttonAttendance.innerHTML = desired;
             }
 
             if (statusBox) {
@@ -126,7 +142,7 @@
         }
 
         async function toggleAttendance() {
-            if (!currentUserId || !button || !csrfToken || !eventId) {
+            if (!currentUserId || !buttonAttendance || !csrfToken || !eventId) {
                 console.warn("toggleAttendance: datos incompletos", {
                     currentUserId,
                     csrfToken,
@@ -136,12 +152,11 @@
             }
 
             try {
-                button.disabled = true;
-                setProcessing(button, "Procesando...");
+                buttonAttendance.disabled = true;
+                setProcessing(buttonAttendance, "Procesando...");
 
                 const action = isAttending ? "leave" : "join";
                 const url = `/events/${eventId}/${action}`;
-
                 const payload = { event_id: eventId, user_id: currentUserId };
 
                 const response = await fetch(url, {
@@ -155,7 +170,6 @@
                     body: JSON.stringify(payload),
                 });
 
-                // Si no hay respuesta JSON, lanzar para entrar en catch
                 let data = {};
                 try {
                     data = await response.json();
@@ -164,22 +178,27 @@
                 }
 
                 if (response.ok) {
-                    const wasAttending = isAttending;
                     const newAttendingStatus = !!data.attending;
-                    if (newAttendingStatus && !wasAttending) attendeeCount++;
-                    else if (!newAttendingStatus && wasAttending)
-                        attendeeCount--;
+
+                    // Actualiza UI
                     updateUI(newAttendingStatus);
 
-                    showStatusModal(
-                        newAttendingStatus
-                            ? "¡Asistencia Confirmada!"
-                            : "Asistencia Cancelada",
-                        newAttendingStatus
-                            ? `Has confirmado correctamente tu asistencia a ${eventTitle}.`
-                            : `Tu asistencia ha sido cancelada para ${eventTitle}.`,
-                        newAttendingStatus ? "join" : "leave"
-                    );
+                    if (newAttendingStatus) {
+                        showStatusModal(
+                            "¡Asistencia Confirmada!",
+                            `Has confirmado correctamente tu asistencia a ${eventTitle}.`,
+                            "join"
+                        );
+                        // Recarga la página para que aparezca el mensaje "Ya has confirmado tu asistencia."
+                        setTimeout(() => window.location.reload(), 1500);
+                    } else {
+                        showStatusModal(
+                            "Asistencia Cancelada",
+                            `Tu asistencia ha sido cancelada para ${eventTitle}.`,
+                            "leave"
+                        );
+                        setTimeout(() => window.location.reload(), 1500);
+                    }
                 } else {
                     console.error(
                         "toggleAttendance: respuesta no OK",
@@ -213,18 +232,8 @@
                     "No se ha podido conectar con el servidor. Intenta de nuevo.",
                     "error"
                 );
-
-                // Fallback: enviar formulario tradicional (si quieres)
-                // const form = document.createElement('form');
-                // form.method = 'POST';
-                // form.action = `/events/${eventId}/${isAttending ? 'leave' : 'join'}`;
-                // form.innerHTML = `<input type="hidden" name="_token" value="${csrfToken}">`;
-                // document.body.appendChild(form);
-                // form.submit();
             } finally {
-                button.disabled = false;
-                // Si la petición falló y no hubo cambio, restauramos el UI al estado actual
-                if (!button.disabled) updateUI(isAttending);
+                buttonAttendance.disabled = false;
             }
         }
 
@@ -272,6 +281,7 @@
             }
 
             const url = `/events/${eventId}/expense`;
+            const payload = { amount, description, payer_id: payerId };
 
             try {
                 const response = await fetch(url, {
@@ -279,77 +289,36 @@
                     headers: {
                         "Content-Type": "application/json",
                         "X-CSRF-TOKEN": csrfToken,
+                        "X-Requested-With": "XMLHttpRequest",
                         Accept: "application/json",
                     },
-                    body: JSON.stringify({
-                        amount,
-                        description,
-                        payer_id: payerId,
-                    }),
+                    body: JSON.stringify(payload),
                 });
+
                 const result = await response.json();
 
                 if (response.ok) {
-                    expenseFormAlert.textContent =
-                        "Gasto registrado con éxito.";
-                    expenseFormAlert.classList.add("alert-success");
-                    expenseFormAlert.classList.remove("d-none");
-                    setTimeout(() => {
-                        if (expenseModal) expenseModal.hide();
-                        window.location.reload();
-                    }, 900);
+                    alert(result.message || "Gasto registrado con éxito.");
+                    window.location.reload();
                 } else {
-                    expenseFormAlert.textContent =
-                        result.message || "Error al registrar el gasto.";
-                    expenseFormAlert.classList.add("alert-danger");
-                    expenseFormAlert.classList.remove("d-none");
+                    console.error(
+                        "Error al registrar gasto:",
+                        response.status,
+                        result
+                    );
+                    alert(
+                        result.message ||
+                            "No se pudo registrar el gasto. Intenta de nuevo."
+                    );
                 }
-            } catch (error) {
-                expenseFormAlert.textContent =
-                    "Error de conexión. Inténtalo de nuevo.";
-                expenseFormAlert.classList.add("alert-danger");
-                expenseFormAlert.classList.remove("d-none");
+            } catch (err) {
+                console.error("Excepción al registrar gasto:", err);
+                alert("Error de conexión con el servidor. Intenta más tarde.");
             } finally {
                 expenseSaveButton.disabled = false;
                 expenseSaveButton.innerHTML =
                     '<i class="bi bi-plus-circle me-1"></i> Guardar Gasto';
             }
-        }
-
-        // Inicialización y listeners
-        if (button) {
-            updateUI(isAttending);
-            button.addEventListener("click", toggleAttendance);
-        }
-
-        if (statusModalElement && statusModal) {
-            statusModalElement.addEventListener("hidden.bs.modal", function () {
-                window.location.reload();
-            });
-        }
-
-        if (expenseModalElement && expenseModal) {
-            expenseModalElement.addEventListener(
-                "show.bs.modal",
-                populatePayerSelect
-            );
-            expenseModalElement.addEventListener(
-                "hidden.bs.modal",
-                function () {
-                    if (expenseForm) expenseForm.reset();
-                    if (expenseFormAlert)
-                        expenseFormAlert.classList.add("d-none");
-                    if (expenseSaveButton) {
-                        expenseSaveButton.disabled = false;
-                        expenseSaveButton.innerHTML =
-                            '<i class="bi bi-plus-circle me-1"></i> Guardar Gasto';
-                    }
-                }
-            );
-        }
-
-        if (expenseForm) {
-            expenseForm.addEventListener("submit", handleAddExpense);
         }
 
         // función para insertar una fila de gasto en la tabla

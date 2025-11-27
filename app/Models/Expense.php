@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Expense extends Model
 {
     public $timestamps = false;
-    
+
     use HasFactory;
 
     // Asumiendo que el campo clave primaria se llama 'expense_id'
@@ -20,6 +20,7 @@ class Expense extends Model
         'payer_id',
         'amount',
         'description',
+        'settled',
     ];
 
     protected $casts = [
