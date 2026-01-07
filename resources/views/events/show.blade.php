@@ -139,14 +139,21 @@
             {{-- Botones de acción --}}
             <div class="mt-4 pt-4 border-top d-flex flex-column flex-md-row justify-content-start gap-3">
                 @auth
+                @if(!$event->isExpired())
                 @if ($isOrganizer)
                 <a href="{{ route('event.edit', $event) }}"
                     class="btn btn-sm btn-outline-secondary fw-bold rounded-pill d-flex align-items-center justify-content-center">
                     <i class="bi bi-gear-fill me-1"></i> Administrar Evento
                 </a>
                 @endif
+                @else
+                <span class="btn btn-sm btn-outline-secondary fw-bold rounded-pill d-flex align-items-center justify-content-center disabled">
+                    <i class="bi bi-gear-fill me-1"></i> Administrar Evento
+                </span>
+                @endif
 
-                {{-- Botón dinámico de asistencia (renderizado en servidor para evitar salto) --}}
+                {{-- Botón dinámico de asistencia --}}
+                @if(!$event->isExpired())
                 <button id="attendance-button"
                     data-event-id="{{ $event->event_id }}"
                     class="btn btn-lg fw-bold shadow-sm rounded-pill d-flex align-items-center justify-content-center {{ $isAttending ? 'btn-custom-red' : 'btn-custom-green' }}"
@@ -158,11 +165,19 @@
                     @endif
                 </button>
                 @else
+                <button class="btn btn-secondary btn-lg fw-bold shadow-sm rounded-pill d-flex align-items-center justify-content-center" type="button" disabled>
+                    <i class="bi bi-calendar-x me-1"></i> Evento vencido
+                </button>
+                @endif
+                @endauth
+
+                @guest
                 <a href="{{ route('login') }}" class="btn btn-custom-green btn-lg fw-bold shadow-sm rounded-pill">
                     <i class="bi bi-box-arrow-in-right me-1"></i> Inicia Sesión para Unirte
                 </a>
-                @endauth
+                @endguest
             </div>
+
         </div>
     </div>
 

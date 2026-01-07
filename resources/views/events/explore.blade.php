@@ -31,7 +31,7 @@
             </div>
         @endif
 
-        {{-- 1. Barra de Filtros Mejorada --}}
+        {{-- 1. Barra de Filtros --}}
         <div class="card shadow-lg mb-5 p-4 border-0 rounded-4">
             <form method="GET" action="{{ route('events.explore') }}">
                 <div class="row g-4">

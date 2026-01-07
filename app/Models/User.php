@@ -15,6 +15,17 @@ use App\Models\Expense;
 class User extends Authenticatable
 {
 
+    // Constantes de roles
+    public const ROLE_ADMIN = 1;
+    public const ROLE_ORGANIZER = 2;
+    public const ROLE_MEMBER = 3;
+
+    // Define los roles que pueden crear/editar eventos
+    protected const EVENT_MANAGEMENT_ROLES = [
+        self::ROLE_ADMIN,
+        self::ROLE_ORGANIZER,
+    ];
+
     public $timestamps = false;
 
     use HasFactory, Notifiable;
@@ -54,6 +65,14 @@ class User extends Authenticatable
         ];
     }
 
+    /**
+     * Comprueba si el usuario es administrador.
+     */
+    public function isAdmin(): bool
+    {
+        return $this->role_id === self::ROLE_ADMIN;
+    }
+
     // -----------------------------------------------------------------
     // RELACIONES
     // -----------------------------------------------------------------
@@ -67,14 +86,14 @@ class User extends Authenticatable
     }
 
 
-        /**
+    /**
      * Eventos a los que asiste el usuario.
      */
     public function events(): BelongsToMany
     {
         return $this->belongsToMany(Event::class, 'attendance', 'user_id', 'event_id')
-                    ->withPivot('is_confirmed', 'confirmation_date')
-                    ->withTimestamps();
+            ->withPivot('is_confirmed', 'confirmation_date')
+            ->withTimestamps();
     }
 
     /**
@@ -100,9 +119,9 @@ class User extends Authenticatable
     public function eventsAttending(): BelongsToMany
     {
         return $this->belongsToMany(Event::class, 'attendance', 'user_id', 'event_id')
-                    ->using(Attendance::class) // Especifica el modelo pivote
-                    ->wherePivot('is_confirmed', true) // Solo eventos confirmados (RF4)
-                    ->withPivot('confirmation_date');
+            ->using(Attendance::class) // Especifica el modelo pivote
+            ->wherePivot('is_confirmed', true) // Solo eventos confirmados (RF4)
+            ->withPivot('confirmation_date');
     }
 
     /**
@@ -113,10 +132,6 @@ class User extends Authenticatable
         return $this->hasMany(Attendance::class, 'user_id');
     }
 
-    // -----------------------------------------------------------------
-    // LÓGICA DE PERMISOS (Corregida)
-    // -----------------------------------------------------------------
-
     /**
      * Verifica si el usuario tiene uno de los roles especificados en un grupo dado.
      * Esta implementación es más robusta y menos propensa a errores de alias de Eloquent.
@@ -125,10 +140,14 @@ class User extends Authenticatable
      * @param array $roleIds Array de IDs de rol (ej: [Group::ROLE_ADMIN, Group::ROLE_ORGANIZER]).
      * @return bool
      */
-    public function hasRoleInGroup(int $groupId, array $roleIds): bool
+    public function hasRoleInGroup(int $groupId, array $roles): bool
     {
-        return $this->groups()
-                    ->where('groups.group_id', $groupId) // Filtra el grupo objetivo en la tabla 'groups'
-                    ->exists();
+        $belongsToGroup = $this->groups()->where('group_id', $groupId)->exists();
+
+        if (!$belongsToGroup) {
+            return false;
+        }
+
+        return in_array($this->role_id, $roles);
     }
 }

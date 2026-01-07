@@ -1,6 +1,6 @@
 <nav class="sidebar shadow-lg d-none d-lg-flex flex-column">
     <div class="d-flex flex-column h-100">
-       {{-- 1. Logo/Título (AQUÍ ESTÁ LA MODIFICACIÓN) --}}
+        {{-- 1. Logo/Título --}}
         <div class="sidebar-header text-center py-4 border-bottom border-secondary mb-3">
             <a href="{{ route('dashboard') }}" class="text-decoration-none">
                 <img src="{{ asset('images/LOGO-sin-eslogan.png') }}" alt="SquadUp Logo" class="img-fluid" style="max-height: 150px;">
@@ -15,7 +15,7 @@
             <li class="nav-item mb-2">
                 <a href="{{ route('dashboard') }}" class="nav-link py-2 px-3 text-white">
                     <i class="bi bi-speedometer2 me-3 fs-5"></i>
-                    Dashboard
+                    Inicio
                 </a>
             </li>
 
@@ -42,6 +42,18 @@
                     Crear Evento
                 </a>
             </li>
+
+            {{-- Panel de Administración (solo para Admin) --}}
+            @auth
+            @if(Auth::user()->isAdmin())
+            <li class="nav-item mb-2 mt-2">
+                <a href="{{ route('admin.dashboard') }}" class="nav-link py-2 px-3 text-warning admin-link">
+                    <i class="bi bi-shield-lock me-3 fs-5"></i>
+                    <span class="small fw-semibold">Panel de Administración</span>
+                </a>
+            </li>
+            @endif
+            @endauth
         </ul>
 
         {{-- 3. Sección de Usuario y Logout --}}
@@ -64,18 +76,34 @@
     </div>
 </nav>
 
-{{-- Estilos para la barra lateral (Se recomienda mantenerlos aquí o en app.blade.php) --}}
+{{-- Estilos para la barra lateral --}}
 <style>
     .sidebar .nav-link {
         transition: background-color 0.2s, color 0.2s;
         border-radius: 0.5rem;
     }
+
     .sidebar .nav-link:hover {
-        background-color: #343a40; /* Hover oscuro */
+        background-color: #343a40;
     }
+
     .sidebar .nav-link.active {
-        background-color: #198754; /* Fondo verde para activo (Success) */
+        background-color: #198754;
         color: white !important;
+        font-weight: bold;
+    }
+
+    /* Hover especial para el enlace de administración */
+    .sidebar .admin-link {
+        transition: background-color 0.2s, color 0.2s;
+        border-radius: 0.5rem;
+    }
+
+    .sidebar .admin-link:hover {
+        background-color: #ffc107;
+        /* amarillo Bootstrap */
+        color: #212529 !important;
+        /* texto oscuro */
         font-weight: bold;
     }
 </style>

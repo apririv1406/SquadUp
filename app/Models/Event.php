@@ -22,6 +22,8 @@ class Event extends Model
      * La clave primaria asociada con la tabla (según tu ER).
      */
     protected $primaryKey = 'event_id';
+    public $incrementing = true;
+    protected $keyType = 'int';
 
     /**
      * Los atributos que se pueden asignar masivamente.
@@ -98,5 +100,10 @@ class Event extends Model
             'event_id',       // FK en pivot hacia events
             'user_id'         // FK en pivot hacia users
         )->withPivot('is_confirmed', 'confirmation_date');
+    }
+
+    public function isExpired(): bool
+    {
+        return $this->event_date < now();
     }
 }

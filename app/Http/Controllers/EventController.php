@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Event;
 use App\Models\Group;
 use App\Models\Expense;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -128,77 +129,76 @@ class EventController extends Controller
         ]);
     }
 
-    /**
-     * Muestra el formulario para crear un nuevo evento (RF1).
-     *
-     * @param Request $request
-     * @return \Illuminate\View\View|\Illuminate\Http\RedirectResponse
-     */
-    public function create(Request $request)
+    public function create()
     {
-        $group_id = $request->input('group_id');
-        /** @var \App\Models\User $user */
-        $user = Auth::user();
-        $groups = $user->groups()->get();
+        $availableSports = [
+            'futbol' => 'Fútbol',
+            'futbol_sala' => 'Fútbol sala',
+            'baloncesto' => 'Baloncesto',
+            'balonmano' => 'Balonmano',
+            'waterpolo' => 'Waterpolo',
+            'tenis' => 'Tenis',
+            'voley' => 'Voleibol',
+            'running' => 'Running / Carrera',
+            'senderismo' => 'Senderismo',
+            'padel' => 'Pádel',
+        ];
 
-        if ($groups->isEmpty()) {
-            return redirect()->route('groups.index')->with('error', 'Debes ser miembro de al menos un grupo para crear un evento.');
-        }
-
-        if ($group_id) {
-            $group = $groups->firstWhere('group_id', $group_id);
-            if (!$group) {
-                $group_id = null;
-            }
-        }
-
-        return view('event.create', compact('groups', 'group_id'));
+        return view('events.create', compact('availableSports'));
     }
 
-    /**
-     * Almacena un nuevo evento en la base de datos (RF1).
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\RedirectResponse
-     */
     public function store(Request $request)
     {
+        $availableSports = [
+            'futbol',
+            'futbol_sala',
+            'baloncesto',
+            'balonmano',
+            'waterpolo',
+            'tenis',
+            'voley',
+            'running',
+            'senderismo',
+            'padel'
+        ];
+
         $validated = $request->validate([
-            'group_id' => ['required', 'exists:groups,group_id'],
-            'title' => ['required', 'string', 'max:150'],
-            'location' => ['nullable', 'string', 'max:255'],
-            'event_date' => ['required', 'date', 'after_or_equal:now'],
-            'sport_name' => ['required', 'string', 'max:100'],
-            'is_public' => ['boolean'],
-            'capacity' => ['nullable', 'integer', 'min:0'],
+            'group_id'   => 'required|exists:groups,group_id',
+            'title'      => 'required|string|max:255',
+            'sport'      => ['required', Rule::in($availableSports)],
+            'location'   => 'required|string|max:255',
+            'event_date' => 'required|date|after:now',
+            'capacity'   => 'nullable|integer|min:1',
+            'is_public'  => 'boolean',
         ]);
 
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        // --- VERIFICACIÓN DE PERMISOS CLAVE (Usando el nuevo método en User) ---
-        $isAuthorized = $user->hasRoleInGroup($validated['group_id'], self::EVENT_MANAGEMENT_ROLES);
-
-        if (!$isAuthorized) {
-            return back()->withInput()->with('error', 'No tienes permiso para crear eventos en este grupo. Solo los Organizadores o Administradores pueden hacerlo.');
-        }
+        $isAuthorized = $user->hasRoleInGroup(
+            $validated['group_id'],
+            [User::ROLE_ADMIN, User::ROLE_ORGANIZER]
+        );
 
         // Crear el evento
         $event = Event::create([
-            'group_id' => $validated['group_id'],
-            'title' => $validated['title'],
-            'location' => $validated['location'],
+            'group_id'   => $validated['group_id'],
+            'title'      => $validated['title'],
+            'location'   => $validated['location'],
             'event_date' => Carbon::parse($validated['event_date']),
-            'sport_name' => $validated['sport_name'],
-            'is_public' => $validated['is_public'] ?? false,
-            'capacity' => $validated['capacity'] ?? 0,
+            'sport_name' => $validated['sport'],
+            'is_public'  => $validated['is_public'] ?? false,
+            'capacity'   => $validated['capacity'] ?? 0,
+            'creator_id' => $user->user_id,
         ]);
 
-        // Registrar la asistencia automática del creador (RF4)
+        // Registrar asistencia automática del creador
         $event->attendees()->attach($user->user_id, ['is_confirmed' => true]);
 
-        return redirect()->route('groups.show', $validated['group_id'])->with('success', 'Evento "' . $event->title . '" creado y confirmado.');
+        return redirect()->route('event.show', $event->event_id)
+            ->with('success', 'Evento creado correctamente.');
     }
+
 
     /**
      * Muestra la vista detallada de un evento específico.
@@ -542,7 +542,7 @@ class EventController extends Controller
         }
 
         // Solo el creador del gasto puede liquidarlo
-        if ($expense->payer_id != $user->id) {
+        if ($expense->payer_id != $user->user_id) {
             return redirect()->route('event.show', $eventId)
                 ->with('error', 'Solo el creador puede liquidar este gasto.');
         }
