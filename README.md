@@ -57,3 +57,68 @@ If you discover a security vulnerability within Laravel, please send an e-mail t
 ## License
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+
+
+
+SquadUp — Documentación Interna
+
+Descripción
+SquadUp es una plataforma para gestionar grupos, eventos y gastos compartidos.
+Incluye roles de usuario, control de gastos, liquidaciones y administración completa.
+
+Tecnologías
+PHP 8.2
+Laravel 12
+MySQL
+Bootstrap 5
+Blade Templates
+
+Estructura principal
+app/
+ ├── Http/
+ │    ├── Controllers/
+ │    │     ├── AdminUserController.php
+ │    │     ├── AdminEventController.php
+ │    │     └── ExpenseController.php
+ │    ├── Middleware/
+ │    │     └── CheckAdmin.php
+ ├── Models/
+ │    ├── User.php
+ │    ├── Event.php
+ │    └── Expense.php
+resources/
+ ├── views/
+ │    ├── admin/users/
+ │    ├── admin/events/
+ │    └── expenses/
+Roles
+Admin → controla usuarios, eventos y grupos.
+Organizer → gestiona eventos.
+Member → participa en eventos y gastos.
+
+Relaciones
+Un usuario puede tener muchos gastos (payer_id).
+Un evento puede tener muchos gastos (event_id).
+Un grupo puede tener muchos eventos.
+
+Eliminación de usuarios y eventos
+Antes de eliminar un usuario o evento, se eliminan sus gastos asociados para evitar errores de foreign key.
+
+
+
+4. DIAGRAMA DE RELACIONES (ERD)
++-----------+         +-------------+         +-------------+
+|  users    | 1     ∞ |  expenses   | ∞     1 |   events    |
++-----------+         +-------------+         +-------------+
+| user_id PK| <-----  | payer_id FK |         | event_id PK |
+| name      |         | event_id FK | ----->  | title       |
+| email     |         | amount      |         | group_id FK |
+| role_id   |         | settle      |         | event_date  |
++-----------+         +-------------+         +-------------+
+
++-------------+
+|   groups    |
++-------------+
+| group_id PK |
+| name        |
++-------------+

@@ -129,8 +129,17 @@ class EventController extends Controller
         ]);
     }
 
-    public function create()
+    public function create(Request $request)
     {
+        $groupId = $request->group_id; // puede venir o no
+
+        // Si viene un group_id, buscamos el grupo
+        $group = null;
+        if ($groupId) {
+            $group = \App\Models\Group::find($groupId);
+        }
+
+        // Lista de deportes
         $availableSports = [
             'futbol' => 'Fútbol',
             'futbol_sala' => 'Fútbol sala',
@@ -141,11 +150,12 @@ class EventController extends Controller
             'voley' => 'Voleibol',
             'running' => 'Running / Carrera',
             'senderismo' => 'Senderismo',
-            'padel' => 'Pádel',
+            'padel' => 'Pádel'
         ];
 
-        return view('events.create', compact('availableSports'));
+        return view('events.create', compact('group', 'groupId', 'availableSports'));
     }
+
 
     public function store(Request $request)
     {

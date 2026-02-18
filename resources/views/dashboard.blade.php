@@ -93,10 +93,6 @@
                         Acciones Rápidas
                     </div>
                     <div class="list-group list-group-flush">
-                        <a href="{{ route('events.explore') }}" class="list-group-item list-group-item-action py-3 d-flex align-items-center">
-                            <i class="bi bi-search me-3 fs-5 text-primary"></i>
-                            Explorar Eventos (Matchmaking)
-                        </a>
                         <a href="{{ route('event.create') }}" class="list-group-item list-group-item-action py-3 d-flex align-items-center">
                             <i class="bi bi-calendar-plus me-3 fs-5 text-success"></i>
                             Crear Nuevo Evento

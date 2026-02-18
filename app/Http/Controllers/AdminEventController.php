@@ -13,7 +13,7 @@ class AdminEventController extends Controller
      */
     public function index()
     {
-        $events = Event::all();
+        $events = Event::orderBy('event_date', 'desc')->get();
         return view('admin.events.index', compact('events'));
     }
 
@@ -44,31 +44,38 @@ class AdminEventController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(string $id)
+    public function edit(Event $event)
     {
-        //
+        // Lista de deportes
+        $sportsList = [
+            'futbol' => 'Fútbol',
+            'futbol_sala' => 'Fútbol sala',
+            'baloncesto' => 'Baloncesto',
+            'balonmano' => 'Balonmano',
+            'waterpolo' => 'Waterpolo',
+            'tenis' => 'Tenis',
+            'voley' => 'Voleibol',
+            'running' => 'Running / Carrera',
+            'senderismo' => 'Senderismo',
+            'padel' => 'Pádel'
+        ];
+
+        // Grupos reales desde la BD
+        $groups = \App\Models\Group::all();
+
+        return view('admin.events.edit', compact('event', 'sportsList', 'groups'));
     }
+
+
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, string $id)
+    public function update(Request $request, Event $event)
     {
-        $event = Event::findOrFail($id);
-
-        // Validación de datos
-        $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'location' => 'required|string|max:255',
-            'event_date' => 'required|date|after:now',
-            'capacity' => 'nullable|integer|min:1',
-            'is_public' => 'required|boolean',
-        ]);
-
-        // Actualizar evento
+        $validated = $request->validate(['title' => 'required|string|max:255', 'event_date' => 'required|date', 'location' => 'nullable|string|max:255', 'description' => 'nullable|string',]);
         $event->update($validated);
-
-        return redirect()->route('events.index')->with('success', 'Evento actualizado correctamente.');
+        return redirect()->route('admin.events.edit', $event->event_id)->with('success', 'Evento actualizado correctamente.');
     }
 
     /**

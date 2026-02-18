@@ -3,103 +3,113 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+use App\Models\Group;
+use App\Models\UserGroup;
 use Illuminate\Support\Facades\Auth;
-use App\Models\Group; // Asegúrate de que este modelo exista y esté correctamente configurado
 
 class GroupController extends Controller
 {
-    /**
-     * Muestra el formulario para crear un nuevo grupo.
-     * @return \Illuminate\View\View
-     */
     public function create()
     {
         return view('groups.create');
     }
 
-    /**
-     * Almacena un nuevo grupo en la base de datos.
-     * @param Request $request
-     * @return \Illuminate\Http\RedirectResponse
-     */
     public function store(Request $request)
     {
-        // 1. Validación de la solicitud
-        $validatedData = $request->validate([
-            'name' => 'required|string|max:100',
-            'description' => 'nullable|string',
-            // El código es opcional (nullable), y si se proporciona, debe ser único y tener 10 caracteres
-            'invitation_code' => 'nullable|string|max:10|unique:groups,invitation_code',
+        $request->validate([
+            'name' => 'required|max:255',
+            'description' => 'nullable|max:500',
         ]);
 
-        // 2. Definición del organizador y del código de invitación
+        // Generar código único
+        do {
+            $code = strtoupper(Str::random(8));
+        } while (Group::where('invitation_code', $code)->exists());
 
-        $organizerId = Auth::id();
+        $user = Auth::user();
 
-        if (!$organizerId) {
-            // Esto debería ser atrapado por el middleware 'auth', pero es una buena práctica de seguridad
-            return back()->withErrors(['auth' => 'Debes iniciar sesión para crear un grupo.'])->withInput();
-        }
+        // Crear grupo
+        $group = Group::create([
+            'organizer_id' => $user->user_id,
+            'name' => $request->name,
+            'description' => $request->description,
+            'invitation_code' => $code,
+        ]);
 
-        // Si el usuario no proporcionó un código, generamos uno automáticamente
-        $invitationCode = $validatedData['invitation_code'] ?? null;
+        // Añadir al creador como miembro
+        UserGroup::create([
+            'group_id' => $group->group_id,
+            'user_id' => $user->user_id,
+        ]);
 
-        if (empty($invitationCode)) {
-            // Generación simple y única de un código de 8 caracteres
-            do {
-                $invitationCode = strtoupper(substr(md5(uniqid(rand(), true)), 0, 8));
-            } while (Group::where('invitation_code', $invitationCode)->exists()); // Asegura unicidad
-        }
-
-
-        // 3. Creación del grupo en la base de datos
-        try {
-            $group = Group::create([
-                'organizer_id' => $organizerId,
-                'name' => $validatedData['name'],
-                'description' => $validatedData['description'],
-                'invitation_code' => $invitationCode,
-            ]);
-
-            // 4. Redirección al grupo recién creado
-            return redirect()->route('groups.show', $group->group_id)
-                             ->with('success', '¡Grupo "' . $group->name . '" creado con éxito! Código: ' . $group->invitation_code);
-
-        } catch (\Exception $e) {
-            // Si hay un error de base de datos (ej. problema de conexión o FK faltante)
-            // En un entorno real, solo registraríamos el error, pero aquí lo mostramos para depuración.
-            return back()->withErrors(['database' => 'Error al guardar el grupo: ' . $e->getMessage()])->withInput();
-        }
+        return redirect()->route('groups.show', $group->group_id)
+            ->with('success', 'Grupo creado correctamente.');
     }
 
-    /**
-     * Muestra los detalles de un grupo específico.
-     * @param string $groupId
-     * @return \Illuminate\View\View|\Illuminate\Http\RedirectResponse
-     */
-    public function show(string $groupId)
+    public function show($group_id)
     {
-        // Asumiendo que Group tiene relaciones 'members' y 'events'
-        $group = Group::with(['members', 'events'])
-                      ->where('group_id', $groupId)
-                      ->first();
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
 
-        if (!$group) {
-            return redirect()->route('dashboard')->with('error', 'El grupo solicitado no existe.');
-        }
+        $group = Group::with(['events', 'members', 'organizer'])
+            ->findOrFail($group_id);
 
-        // Comprobación de que el usuario actual es miembro del grupo (o el organizador)
-        // Esto es una simplificación, la lógica real requeriría verificar la tabla user_group.
-        $isOrganizer = Auth::id() === $group->organizer_id;
-
-        // Simulación de pertenencia si no se implementa user_group por ahora.
-        // En una implementación real, se verificaría la tabla pivot USER_GROUP.
-        $isMember = $isOrganizer || $group->members->contains(Auth::user());
-
-        if (!$isMember) {
-             return redirect()->route('dashboard')->with('error', 'No tienes permiso para ver este grupo.');
-        }
+        // Saber si el usuario autenticado es el organizador
+        $isOrganizer = $user->user_id === $group->organizer_id;
 
         return view('groups.show', compact('group', 'isOrganizer'));
+    }
+
+    public function index()
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        $groups = $user->groups; // grupos donde el usuario es miembro
+        return view('groups.index', compact('groups'));
+    }
+
+    public function joinByCode(Request $request)
+    {
+        $user = Auth::user();
+
+        $request->validate([
+            'invitation_code' => 'required|string'
+        ]);
+
+        // Buscar grupo por código
+        $group = Group::where('invitation_code', $request->invitation_code)->first();
+
+        if (!$group) {
+            return back()->with('error', 'El código de invitación no es válido.');
+        }
+
+        // Comprobar si ya pertenece
+        if ($group->members()->where('users.user_id', $user->user_id)->exists()) {
+            return back()->with('info', 'Ya eres miembro de este grupo.');
+        }
+
+        // Añadir al usuario al grupo
+        $group->members()->attach($user->user_id);
+
+        return redirect()->route('groups.show', $group->group_id)
+            ->with('success', 'Te has unido al grupo correctamente.');
+    }
+
+    public function leave($group_id)
+    {
+        $user = Auth::user();
+        $group = Group::with('events')->findOrFail($group_id);
+
+        // Eliminar participación del usuario en todos los eventos del grupo
+        foreach ($group->events as $event) {
+            $event->attendees()->detach($user->user_id);
+        }
+
+        // Eliminar al usuario del grupo
+        $group->members()->detach($user->user_id);
+
+        return redirect()->route('groups.index')
+            ->with('success', 'Has abandonado el grupo y se ha eliminado tu participación en sus eventos.');
     }
 }

@@ -45,34 +45,26 @@ class AdminUserController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(string $id)
+    public function edit(User $user)
     {
-        //
+        $roles = \App\Models\Role::all();
+        return view('admin.users.edit', compact('user', 'roles'));
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
+    public function update(Request $request, User $user)
     {
-        $user = User::findOrFail($id);
-
-        // Validación de datos
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email,' . $user->user_id . ',user_id',
-            'role_id' => 'required|integer|in:' . implode(',', [
-                User::ROLE_ADMIN,
-                User::ROLE_ORGANIZER,
-                User::ROLE_MEMBER,
-            ]),
+            'email' => 'required|email|max:255|unique:users,email,' . $user->user_id . ',user_id',
+            'role' => 'required|string',
         ]);
 
-        // Actualizar usuario
         $user->update($validated);
 
-        return redirect()->route('users.index')->with('success', 'Usuario actualizado correctamente.');
+        return redirect()->route('admin.users.edit', $user->user_id)
+            ->with('success', 'Usuario actualizado correctamente.');
     }
+
 
     /**
      * Remove the specified resource from storage.

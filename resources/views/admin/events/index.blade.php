@@ -31,11 +31,11 @@
                 <td>{{ $event->event_date->format('d/m/Y H:i') }}</td>
                 <td>{{ $event->capacity ?? 'Ilimitado' }}</td>
                 <td>
-                    <a href="{{ route('events.edit', $event->event_id) }}" class="btn btn-sm btn-warning">Editar</a>
+                    <a href="{{ route('admin.events.edit', $event->event_id) }}" class="btn btn-sm btn-warning">Editar</a>
 
                     {{-- Formulario por fila con ruta correcta --}}
                     <form id="delete-event-{{ $event->event_id }}"
-                        action="{{ route('events.destroy', $event->event_id) }}"
+                        action="{{ route('admin.events.destroy', $event->event_id) }}"
                         method="POST"
                         class="d-inline">
                         @csrf

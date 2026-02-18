@@ -53,19 +53,24 @@ Route::middleware('auth')->group(function () {
     Route::post('/events/{event}/expense/{expense}/settle', [EventController::class, 'settle'])->name('event.expense.settle');
 
     // Grupos
-    Route::prefix('groups')->group(function () {
-        Route::get('/', [GroupController::class, 'index'])->name('groups.index');
-        Route::get('/create', [GroupController::class, 'create'])->name('groups.create');
-        Route::post('/', [GroupController::class, 'store'])->name('groups.store');
-    });
+    Route::get('/groups', [GroupController::class, 'index'])->name('groups.index');
+    Route::get('/groups/create', [GroupController::class, 'create'])->name('groups.create');
+    Route::post('/groups', [GroupController::class, 'store'])->name('groups.store');
     Route::get('/groups/{group}', [GroupController::class, 'show'])->name('groups.show');
+    // Unirse a un grupo mediante código
+    Route::post('/groups/join', [GroupController::class, 'joinByCode'])->name('groups.joinByCode');
+    Route::post('/groups/{group}/leave', [GroupController::class, 'leave'])->name('groups.leave');
+
 
     // Administración (solo Admin)
-    Route::middleware(['is_admin'])->prefix('admin')->group(function () {
-        Route::get('/dashboard', [AdminController::class, 'index'])->name('admin.dashboard');
-        Route::resource('/users', AdminUserController::class);
-        Route::resource('/events', AdminEventController::class);
-    });
+    Route::middleware(['is_admin'])
+        ->prefix('admin')
+        ->as('admin.')
+        ->group(function () {
+            Route::get('/dashboard', [AdminController::class, 'index'])->name('dashboard');
+            Route::resource('users', AdminUserController::class);
+            Route::resource('events', AdminEventController::class);
+        });
 });
 
 require __DIR__ . '/auth.php';

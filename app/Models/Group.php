@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Group extends Model
 {
     public $timestamps = false;
-    
+
     use HasFactory;
 
     // Define los IDs de rol que se utilizan en la tabla pivote 'user_group'
@@ -30,24 +30,16 @@ class Group extends Model
      * Los atributos que son asignables masivamente.
      */
     protected $fillable = [
+        'organizer_id',
         'name',
         'description',
-        'is_public',
+        'invitation_code',
     ];
+
 
     // -----------------------------------------------------------------
     // RELACIONES
     // -----------------------------------------------------------------
-
-    /**
-     * Los usuarios que pertenecen a este grupo.
-     */
-    public function members(): BelongsToMany
-    {
-        return $this->belongsToMany(User::class, 'user_group', 'group_id', 'user_id')
-                    ->withPivot('role_id') // Necesario para la lógica de permisos
-                    ->withTimestamps();
-    }
 
     /**
      * Los eventos que pertenecen a este grupo.
@@ -55,5 +47,15 @@ class Group extends Model
     public function events(): HasMany
     {
         return $this->hasMany(Event::class, 'group_id', 'group_id');
+    }
+
+    public function members()
+    {
+        return $this->belongsToMany(User::class, 'user_group', 'group_id', 'user_id');
+    }
+
+    public function organizer()
+    {
+        return $this->belongsTo(User::class, 'organizer_id', 'user_id');
     }
 }

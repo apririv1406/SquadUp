@@ -85,7 +85,6 @@ class User extends Authenticatable
         return $this->belongsToMany(Group::class, 'user_group', 'user_id', 'group_id');
     }
 
-
     /**
      * Eventos a los que asiste el usuario.
      */
@@ -142,7 +141,7 @@ class User extends Authenticatable
      */
     public function hasRoleInGroup(int $groupId, array $roles): bool
     {
-        $belongsToGroup = $this->groups()->where('group_id', $groupId)->exists();
+        $belongsToGroup = $this->groups()->where('user_group.group_id', $groupId)->exists();
 
         if (!$belongsToGroup) {
             return false;

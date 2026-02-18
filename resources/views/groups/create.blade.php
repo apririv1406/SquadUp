@@ -1,77 +1,71 @@
 @extends('layouts.app')
 
-@section('title', 'Crear Nuevo Grupo')
+@section('title', 'Crear Grupo')
 
 @section('content')
-<div class="container-fluid py-5">
-    <div class="row justify-content-center">
-        <div class="col-xl-7 col-lg-8">
+<div class="container my-5">
 
-            {{-- Título y Contexto --}}
-            <div class="d-flex align-items-center mb-4">
-                <i class="bi bi-people-fill text-custom-green me-3" style="font-size: 2.5rem;"></i>
-                <div>
-                    <h1 class="h3 fw-bold mb-0">Crear Nuevo Colectivo Deportivo</h1>
-                    <p class="text-muted mb-0 small">Define la identidad de tu grupo y comienza a organizar eventos.</p>
-                </div>
+    <h1 class="fw-bold mb-4 text-dark">Crear Nuevo Grupo</h1>
+
+    <form action="{{ route('groups.store') }}" method="POST" class="card shadow-sm p-4 rounded-4 border-0">
+        @csrf
+
+        {{-- NOMBRE --}}
+        <div class="mb-3">
+            <label class="form-label fw-bold">Nombre del grupo</label>
+            <input type="text" name="name" class="form-control rounded-3" required>
+        </div>
+
+        {{-- DESCRIPCIÓN --}}
+        <div class="mb-3">
+            <label class="form-label fw-bold">Descripción (opcional)</label>
+            <textarea name="description" class="form-control rounded-3" rows="3"></textarea>
+        </div>
+
+        {{-- CÓDIGO DE INVITACIÓN --}}
+        <div class="mb-4">
+            <label class="form-label fw-bold">Código de invitación</label>
+
+            <div class="input-group">
+                <input type="text" name="invitation_code" id="invitation_code"
+                       class="form-control rounded-start-3"
+                       placeholder="Introduce un código o genera uno"
+                       maxlength="12">
+
+                <button type="button"
+                        class="btn btn-success fw-bold rounded-end-3"
+                        onclick="generateCode()">
+                    Generar
+                </button>
             </div>
 
-            {{-- Tarjeta del Formulario --}}
-            <div class="card shadow-lg border-0" style="border-radius: 1rem;">
-                <div class="card-header bg-custom-green-light border-0" style="border-top-left-radius: 1rem; border-top-right-radius: 1rem;">
-                    <h5 class="mb-0 text-white fw-bold">Información Básica del Grupo</h5>
-                </div>
-                <div class="card-body p-4 p-md-5">
-
-                    {{-- Formulario de Creación --}}
-                    {{-- La acción apunta al método store del GroupController --}}
-                    <form method="POST" action="{{ route('groups.store') }}">
-                        @csrf
-
-                        {{-- 1. Nombre del Grupo --}}
-                        <div class="mb-4">
-                            <label for="name" class="form-label fw-bold text-muted">Nombre del Grupo <span class="text-danger">*</span></label>
-                            <input type="text" name="name" id="name"
-                                   class="form-control rounded-pill @error('name') is-invalid @enderror"
-                                   value="{{ old('name') }}" required autofocus maxlength="100"
-                                   placeholder="Ej: Los Invencibles de Baloncesto">
-                            @error('name')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-
-                        {{-- 2. Descripción --}}
-                        <div class="mb-4">
-                            <label for="description" class="form-label fw-bold text-muted">Descripción (Opcional)</label>
-                            <textarea name="description" id="description"
-                                      class="form-control @error('description') is-invalid @enderror"
-                                      rows="4" placeholder="Breve descripción de la misión, objetivos o tipo de actividades del grupo.">{{ old('description') }}</textarea>
-                            @error('description')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-
-                        {{-- Nota de Rol --}}
-                        <div class="alert alert-info border-0 rounded-3 small mt-4" role="alert">
-                            <i class="bi bi-info-circle-fill me-2"></i>
-                            Como creador, serás automáticamente asignado como el **Organizador** de este grupo.
-                        </div>
-
-                        {{-- Botón de Creación --}}
-                        <div class="d-grid mt-5">
-                            <button type="submit" class="btn btn-custom-green rounded-pill fw-bold py-3">
-                                <i class="bi bi-check-circle-fill me-2"></i> Crear Grupo
-                            </button>
-                        </div>
-
-                        <div class="text-center mt-3">
-                            <a href="{{ route('dashboard') }}" class="small text-muted">Volver al Dashboard</a>
-                        </div>
-                    </form>
-
-                </div>
-            </div> {{-- Fin Card --}}
+            <small class="text-muted">
+                Puedes escribir tu propio código o generar uno aleatorio.
+            </small>
         </div>
-    </div>
+
+        {{-- BOTÓN CREAR --}}
+        <button type="submit"
+                class="btn fw-bold px-4 py-2 rounded-pill shadow-sm"
+                style="background-color:#2E7D32; color:white; border:2px solid #4CAF50;">
+            <i class="bi bi-people-fill me-1"></i> Crear Grupo
+        </button>
+
+    </form>
 </div>
+
+{{-- SCRIPT PARA GENERAR CÓDIGO --}}
+<script>
+    function generateCode() {
+        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        let code = "";
+
+        for (let i = 0; i < 8; i++) {
+            code += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+
+        document.getElementById('invitation_code').value = code;
+    }
+</script>
+
 @endsection
