@@ -7,8 +7,6 @@ export default defineConfig({
             input: [
                 'resources/css/app.css',
                 'resources/js/app.js',
-                'resources/js/expenseHandler.js',
-                'resources/js/eventPageHandler.js'
             ],
             refresh: true,
         }),
