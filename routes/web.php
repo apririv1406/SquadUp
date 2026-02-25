@@ -44,7 +44,7 @@ Route::get('/debug-roles', function () {
 });
 
 
-Route::get('/debug-users', function () {
+Route::get('/debug-users-data', function () {
     return DB::table('users')->get();
 });
 
