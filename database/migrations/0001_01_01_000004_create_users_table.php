@@ -14,7 +14,6 @@ return new class extends Migration
             $table->string('name', 100);
             $table->string('email', 100);
             $table->char('password', 60);
-            $table->timestamp('created_at')->useCurrent();
             $table->string('google_id', 255)->nullable();
 
             $table->foreign('role_id')->references('role_id')->on('roles');

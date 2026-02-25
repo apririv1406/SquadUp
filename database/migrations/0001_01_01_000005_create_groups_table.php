@@ -14,7 +14,6 @@ return new class extends Migration
             $table->string('name', 100);
             $table->text('description')->nullable();
             $table->string('invitation_code', 10)->nullable();
-            $table->timestamp('created_at')->useCurrent();
 
             $table->foreign('organizer_id')->references('user_id')->on('users');
         });

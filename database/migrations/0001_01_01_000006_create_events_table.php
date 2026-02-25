@@ -16,7 +16,6 @@ return new class extends Migration
             $table->dateTime('event_date');
             $table->boolean('is_public')->default(0);
             $table->integer('capacity')->default(0);
-            $table->timestamp('created_at')->useCurrent();
             $table->string('sport_name', 255);
             $table->integer('creator_id');
 

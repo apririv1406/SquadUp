@@ -14,7 +14,7 @@ return new class extends Migration
             $table->unsignedBigInteger('payer_id');
             $table->decimal('amount', 10, 2);
             $table->string('description', 255);
-            $table->timestamp('created_at')->useCurrent();
+            $table->timestamp('created_at')->useCurrent()->nullable();
             $table->boolean('settled')->default(0);
 
             $table->foreign('event_id')->references('event_id')->on('events');
