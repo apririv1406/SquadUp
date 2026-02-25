@@ -14,7 +14,7 @@ class UsersSeeder extends Seeder
      */
     public function run(): void
     {
-        DB::table('users')->insert([
+        DB::table('users')->updateOrInsert([
             [
                 'user_id'   => 1,
                 'role_id'   => 1, // admin
