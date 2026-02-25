@@ -29,9 +29,10 @@ RUN composer install --no-dev --optimize-autoloader
 # Permisos
 RUN chown -R www-data:www-data storage bootstrap/cache
 
-# EJECUTAR MIGRACIONES ANTES DE ARRANCAR APACHE
-RUN php artisan migrate --force && php artisan db:seed --force
+# Copiar entrypoint
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 EXPOSE 80
 
-CMD ["apache2-foreground"]
+ENTRYPOINT ["docker-entrypoint.sh"]
