@@ -79,7 +79,7 @@
                 <h4 class="fw-bold text-dark">Próximos Eventos</h4>
 
                 @if ($isOrganizer)
-                    <a href="{{ route('event.create', ['group_id' => $group->group_id]) }}"
+                    <a href="{{ route('event.create') }}"
                         class="btn fw-bold px-4 py-2 rounded-pill shadow-sm"
                         style="background-color: #2E7D32; color: white; border: 2px solid #4CAF50;">
                         <i class="bi bi-calendar-plus me-2"></i>

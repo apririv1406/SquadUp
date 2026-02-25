@@ -9,7 +9,6 @@
 
     <form action="{{ route('groups.store') }}" method="POST" class="card shadow-sm p-4 rounded-4 border-0">
         @csrf
-
         {{-- NOMBRE --}}
         <div class="mb-3">
             <label class="form-label fw-bold">Nombre del grupo</label>
@@ -28,13 +27,13 @@
 
             <div class="input-group">
                 <input type="text" name="invitation_code" id="invitation_code"
-                       class="form-control rounded-start-3"
-                       placeholder="Introduce un código o genera uno"
-                       maxlength="12">
+                    class="form-control rounded-start-3"
+                    placeholder="Introduce un código o genera uno"
+                    maxlength="12">
 
                 <button type="button"
-                        class="btn btn-success fw-bold rounded-end-3"
-                        onclick="generateCode()">
+                    class="btn btn-success fw-bold rounded-end-3"
+                    onclick="generateCode()">
                     Generar
                 </button>
             </div>
@@ -46,8 +45,8 @@
 
         {{-- BOTÓN CREAR --}}
         <button type="submit"
-                class="btn fw-bold px-4 py-2 rounded-pill shadow-sm"
-                style="background-color:#2E7D32; color:white; border:2px solid #4CAF50;">
+            class="btn fw-bold px-4 py-2 rounded-pill shadow-sm"
+            style="background-color:#2E7D32; color:white; border:2px solid #4CAF50;">
             <i class="bi bi-people-fill me-1"></i> Crear Grupo
         </button>
 
