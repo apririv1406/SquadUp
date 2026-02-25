@@ -14,6 +14,64 @@ use App\Http\Controllers\AdminEventController;
 
 use Illuminate\Support\Facades\Auth;
 
+use Illuminate\Support\Facades\DB;
+
+Route::get('/debug-users', function () {
+    return DB::select("
+        SELECT column_name, data_type, is_nullable
+        FROM information_schema.columns
+        WHERE table_name = 'users'
+        ORDER BY ordinal_position
+    ");
+});
+
+Route::get('/debug-roles-columns', function () {
+    return DB::select("
+        SELECT column_name, data_type, is_nullable
+        FROM information_schema.columns
+        WHERE table_name = 'roles'
+        ORDER BY ordinal_position
+    ");
+});
+
+Route::get('/debug-roles', function () {
+    return DB::table('roles')->get();
+});
+
+
+Route::get('/debug-users-data', function () {
+    return DB::table('users')->get();
+});
+
+Route::get('/debug-groups-data', function () {
+    return DB::table('groups')->get();
+});
+
+Route::get('/debug-groups-columns', function () {
+    return DB::select("
+        SELECT column_name, data_type, is_nullable
+        FROM information_schema.columns
+        WHERE table_name = 'groups'
+        ORDER BY ordinal_position
+    ");
+});
+
+
+Route::get('/debug-migrations', function () {
+    return DB::table('migrations')->get();
+});
+
+Route::get('/fix-roles', function () {
+    DB::table('roles')->insert([
+        ['role_id' => 1, 'name' => 'admin'],
+        ['role_id' => 2, 'name' => 'organizer'],
+        ['role_id' => 3, 'name' => 'member'],
+    ]);
+
+    return 'Roles insertados correctamente';
+});
+
+
 // Rutas de Socialite (Autenticación con Google)
 Route::get('login/auth/google/redirect', [SocialiteController::class, 'redirect'])->name('socialite.redirect');
 Route::get('login/auth/google/callback', [SocialiteController::class, 'callback']);
