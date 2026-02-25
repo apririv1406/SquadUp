@@ -19,6 +19,40 @@ Route::get('login/auth/google/redirect', [SocialiteController::class, 'redirect'
 Route::get('login/auth/google/callback', [SocialiteController::class, 'callback']);
 Route::get('/login/auth/google', [SocialiteController::class, 'redirect'])->name('google.login');
 
+use Illuminate\Support\Facades\DB;
+
+Route::get('/debug-users', function () {
+    return DB::select("
+        SELECT column_name, data_type, is_nullable
+        FROM information_schema.columns
+        WHERE table_name = 'users'
+        ORDER BY ordinal_position
+    ");
+});
+
+Route::get('/debug-roles-columns', function () {
+    return DB::select("
+        SELECT column_name, data_type, is_nullable
+        FROM information_schema.columns
+        WHERE table_name = 'roles'
+        ORDER BY ordinal_position
+    ");
+});
+
+Route::get('/debug-roles', function () {
+    return DB::table('roles')->get();
+});
+
+
+Route::get('/debug-users', function () {
+    return DB::table('users')->get();
+});
+
+Route::get('/debug-migrations', function () {
+    return DB::table('migrations')->get();
+});
+
+
 // Página de inicio
 Route::get('/', function () {
     if (Auth::check()) {
@@ -72,5 +106,6 @@ Route::middleware('auth')->group(function () {
             Route::resource('events', AdminEventController::class);
         });
 });
+
 
 require __DIR__ . '/auth.php';
