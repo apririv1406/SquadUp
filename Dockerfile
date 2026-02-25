@@ -29,8 +29,8 @@ RUN composer install --no-dev --optimize-autoloader
 # Permisos
 RUN chown -R www-data:www-data storage bootstrap/cache
 
-# ⭐ EJECUTAR MIGRACIONES ANTES DE ARRANCAR APACHE
-RUN php artisan migrate --force
+# EJECUTAR MIGRACIONES ANTES DE ARRANCAR APACHE
+RUN php artisan migrate --force && php artisan db:seed --force
 
 EXPOSE 80
 
