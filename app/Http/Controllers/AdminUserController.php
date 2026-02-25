@@ -56,7 +56,7 @@ class AdminUserController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|max:255|unique:users,email,' . $user->user_id . ',user_id',
-            'role' => 'required|string',
+            'role_id' => 'required|string',
         ]);
 
         $user->update($validated);
@@ -75,15 +75,14 @@ class AdminUserController extends Controller
         $expenses = \App\Models\Expense::where('payer_id', $user->user_id)->get();
 
         if ($expenses->isNotEmpty()) {
-            // Eliminar todos los gastos asociados (liquidados o no)
             foreach ($expenses as $expense) {
                 $expense->delete();
             }
         }
 
-        // Ahora sí se puede eliminar el usuario
         $user->delete();
 
-        return redirect()->route('users.index')->with('success', 'Usuario y sus gastos asociados eliminados correctamente.');
+        return redirect()->route('admin.users.index')
+            ->with('success', 'Usuario y sus gastos asociados eliminados correctamente.');
     }
 }

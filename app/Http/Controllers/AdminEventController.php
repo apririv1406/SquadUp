@@ -96,6 +96,6 @@ class AdminEventController extends Controller
         // Ahora sí se puede eliminar el evento
         $event->delete();
 
-        return redirect()->route('events.index')->with('success', 'Evento y sus gastos asociados eliminados correctamente.');
+        return redirect()->route('admin.events.index')->with('success', 'Evento y sus gastos asociados eliminados correctamente.');
     }
 }

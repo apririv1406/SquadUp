@@ -43,19 +43,20 @@ class GroupController extends Controller
             'user_id' => $user->user_id,
         ]);
 
+        //Cargar relaciones ANTES de redirigir
+        $group->load(['organizer', 'members', 'events']);
+
         return redirect()->route('groups.show', $group->group_id)
             ->with('success', 'Grupo creado correctamente.');
     }
 
     public function show($group_id)
     {
-        /** @var \App\Models\User $user */
         $user = Auth::user();
 
         $group = Group::with(['events', 'members', 'organizer'])
             ->findOrFail($group_id);
 
-        // Saber si el usuario autenticado es el organizador
         $isOrganizer = $user->user_id === $group->organizer_id;
 
         return view('groups.show', compact('group', 'isOrganizer'));
@@ -63,9 +64,8 @@ class GroupController extends Controller
 
     public function index()
     {
-        /** @var \App\Models\User $user */
         $user = Auth::user();
-        $groups = $user->groups; // grupos donde el usuario es miembro
+        $groups = $user->groups;
         return view('groups.index', compact('groups'));
     }
 
@@ -77,19 +77,16 @@ class GroupController extends Controller
             'invitation_code' => 'required|string'
         ]);
 
-        // Buscar grupo por código
         $group = Group::where('invitation_code', $request->invitation_code)->first();
 
         if (!$group) {
             return back()->with('error', 'El código de invitación no es válido.');
         }
 
-        // Comprobar si ya pertenece
         if ($group->members()->where('users.user_id', $user->user_id)->exists()) {
             return back()->with('info', 'Ya eres miembro de este grupo.');
         }
 
-        // Añadir al usuario al grupo
         $group->members()->attach($user->user_id);
 
         return redirect()->route('groups.show', $group->group_id)
@@ -101,12 +98,10 @@ class GroupController extends Controller
         $user = Auth::user();
         $group = Group::with('events')->findOrFail($group_id);
 
-        // Eliminar participación del usuario en todos los eventos del grupo
         foreach ($group->events as $event) {
             $event->attendees()->detach($user->user_id);
         }
 
-        // Eliminar al usuario del grupo
         $group->members()->detach($user->user_id);
 
         return redirect()->route('groups.index')
