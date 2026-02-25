@@ -52,6 +52,16 @@ Route::get('/debug-migrations', function () {
     return DB::table('migrations')->get();
 });
 
+Route::get('/fix-roles', function () {
+    DB::table('roles')->insert([
+        ['role_id' => 1, 'name' => 'admin'],
+        ['role_id' => 2, 'name' => 'organizer'],
+        ['role_id' => 3, 'name' => 'member'],
+    ]);
+
+    return 'Roles insertados correctamente';
+});
+
 
 // Página de inicio
 Route::get('/', function () {
