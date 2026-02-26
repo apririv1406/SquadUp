@@ -190,10 +190,11 @@ class EventController extends Controller
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        $isAuthorized = $user->hasRoleInGroup(
-            $validated['group_id'],
-            [User::ROLE_ADMIN, User::ROLE_ORGANIZER]
-        );
+        $isAuthorized = $user->groups->contains($validated['group_id']);
+
+        if (!$isAuthorized) {
+            return back()->with('error', 'Debes ser miembro del grupo para crear eventos.');
+        }
 
         // Crear el evento
         $event = Event::create([
@@ -339,7 +340,14 @@ class EventController extends Controller
         $user = Auth::user();
 
         // --- VERIFICACIÓN DE PERMISOS CLAVE ---
-        $isAuthorized = $user->hasRoleInGroup($event->group_id, self::EVENT_MANAGEMENT_ROLES);
+        // El creador del evento SIEMPRE puede editarlo
+        $isCreator = $user->user_id === $event->creator_id;
+
+        // El admin del grupo también puede editarlo
+        $isAdmin = $user->hasRoleInGroup($event->group_id, [User::ROLE_ADMIN]);
+
+        // Permiso final
+        $isAuthorized = $isCreator || $isAdmin;
 
         if (!$isAuthorized) {
             return back()->with('error', 'No tienes permiso para editar este evento.');
@@ -376,11 +384,19 @@ class EventController extends Controller
         $user = Auth::user();
 
         // --- VERIFICACIÓN DE PERMISOS CLAVE ---
-        $isAuthorized = $user->hasRoleInGroup($event->group_id, self::EVENT_MANAGEMENT_ROLES);
+        // El creador del evento SIEMPRE puede editarlo
+        $isCreator = $user->user_id === $event->creator_id;
+
+        // El admin del grupo también puede editarlo
+        $isAdmin = $user->hasRoleInGroup($event->group_id, [User::ROLE_ADMIN]);
+
+        // Permiso final
+        $isAuthorized = $isCreator || $isAdmin;
 
         if (!$isAuthorized) {
-            return back()->with('error', 'No tienes permiso para actualizar este evento.');
+            return back()->with('error', 'No tienes permiso para editar este evento.');
         }
+
 
         // Reglas de validación
         $validated = $request->validate([
@@ -417,11 +433,19 @@ class EventController extends Controller
         $user = Auth::user();
 
         // --- VERIFICACIÓN DE PERMISOS CLAVE ---
-        $isAuthorized = $user->hasRoleInGroup($event->group_id, self::EVENT_MANAGEMENT_ROLES);
+        // El creador del evento SIEMPRE puede editarlo
+        $isCreator = $user->user_id === $event->creator_id;
+
+        // El admin del grupo también puede editarlo
+        $isAdmin = $user->hasRoleInGroup($event->group_id, [User::ROLE_ADMIN]);
+
+        // Permiso final
+        $isAuthorized = $isCreator || $isAdmin;
 
         if (!$isAuthorized) {
-            return back()->with('error', 'No tienes permiso para eliminar este evento.');
+            return back()->with('error', 'No tienes permiso para editar este evento.');
         }
+
 
         $eventTitle = $event->title;
         $groupId = $event->group_id; // Obtenemos el ID del grupo para redirigir
