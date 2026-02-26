@@ -16,8 +16,8 @@ return new class extends Migration
 
             $table->primary(['user_id', 'event_id']);
 
-            $table->foreign('user_id')->references('user_id')->on('users');
-            $table->foreign('event_id')->references('event_id')->on('events');
+            $table->foreign('user_id')->references('user_id')->on('users')->onDelete('cascade');
+            $table->foreign('event_id')->references('event_id')->on('events')->onDelete('cascade');
         });
     }
 

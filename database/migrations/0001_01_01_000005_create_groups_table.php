@@ -15,7 +15,7 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->string('invitation_code', 10)->nullable();
 
-            $table->foreign('organizer_id')->references('user_id')->on('users');
+            $table->foreign('organizer_id')->references('user_id')->on('users')->onDelete('cascade');
         });
     }
 

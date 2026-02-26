@@ -12,11 +12,11 @@ return new class extends Migration
             $table->bigIncrements('user_id');
             $table->unsignedInteger('role_id');
             $table->string('name', 100);
-            $table->string('email', 100);
+            $table->string('email', 100)->unique();
             $table->char('password', 60);
             $table->string('google_id', 255)->nullable();
 
-            $table->foreign('role_id')->references('role_id')->on('roles');
+            $table->foreign('role_id')->references('role_id')->on('roles')->onDelete('cascade');
         });
     }
 

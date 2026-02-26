@@ -14,11 +14,11 @@ return new class extends Migration
             $table->unsignedBigInteger('payer_id');
             $table->decimal('amount', 10, 2);
             $table->string('description', 255);
-            $table->timestamp('created_at')->useCurrent()->nullable();
+            $table->timestamp('created_at')->nullable();
             $table->boolean('settled')->default(0);
 
-            $table->foreign('event_id')->references('event_id')->on('events');
-            $table->foreign('payer_id')->references('user_id')->on('users');
+            $table->foreign('event_id')->references('event_id')->on('events')->onDelete('cascade');
+            $table->foreign('payer_id')->references('user_id')->on('users')->onDelete('cascade');
         });
     }
 

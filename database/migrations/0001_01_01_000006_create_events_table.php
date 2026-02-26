@@ -17,9 +17,10 @@ return new class extends Migration
             $table->boolean('is_public')->default(0);
             $table->integer('capacity')->default(0);
             $table->string('sport_name', 255);
-            $table->integer('creator_id');
+            $table->unsignedBigInteger('creator_id');
 
-            $table->foreign('group_id')->references('group_id')->on('groups');
+            $table->foreign('group_id')->references('group_id')->on('groups')->onDelete('cascade');
+            $table->foreign('creator_id')->references('user_id')->on('users')->onDelete('cascade');
         });
     }
 
