@@ -239,6 +239,11 @@ class EventController extends Controller
 
             Log::info('EVENTO: Iniciando validación...');
 
+            // Convertir checkbox "on" a boolean real
+            $request->merge([
+                'is_public' => $request->has('is_public'),
+            ]);
+
             $validated = $request->validate([
                 'group_id'   => 'required|exists:groups,group_id',
                 'title'      => 'required|string|max:255',
@@ -248,6 +253,7 @@ class EventController extends Controller
                 'capacity'   => 'nullable|integer|min:1',
                 'is_public'  => 'boolean',
             ]);
+
 
             Log::info('EVENTO: Validación OK', $validated);
 
