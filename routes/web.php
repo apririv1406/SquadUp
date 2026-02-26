@@ -70,8 +70,21 @@ Route::get('/debug-usergroups-data', function () {
     return DB::table('user_group')->get();
 });
 
-Route::get('/debug-event-data', function () {
+Route::get('/debug-events-data', function () {
     return DB::table('events')->get();
+});
+Route::get('/debug-events-columns', function () {
+    return DB::select("
+        SELECT column_name, data_type, is_nullable
+        FROM information_schema.columns
+        WHERE table_name = 'events'
+        ORDER BY ordinal_position;
+
+    ");
+});
+
+Route::get('/debug/logs', function () {
+    return nl2br(file_get_contents(storage_path('logs/laravel.log')));
 });
 
 

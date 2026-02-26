@@ -162,7 +162,7 @@ class EventController extends Controller
     }
 
 
-    public function store(Request $request)
+    public function store__BAK(Request $request)
     {
         $availableSports = [
             'futbol',
@@ -214,6 +214,107 @@ class EventController extends Controller
         return redirect()->route('event.show', $event->event_id)
             ->with('success', 'Evento creado correctamente.');
     }
+
+
+    public function store(Request $request)
+    {
+        Log::info('EVENTO: Entrando al método store()', [
+            'input' => $request->all()
+        ]);
+
+        try {
+
+            $availableSports = [
+                'futbol',
+                'futbol_sala',
+                'baloncesto',
+                'balonmano',
+                'waterpolo',
+                'tenis',
+                'voley',
+                'running',
+                'senderismo',
+                'padel'
+            ];
+
+            Log::info('EVENTO: Iniciando validación...');
+
+            $validated = $request->validate([
+                'group_id'   => 'required|exists:groups,group_id',
+                'title'      => 'required|string|max:255',
+                'sport'      => ['required', Rule::in($availableSports)],
+                'location'   => 'required|string|max:255',
+                'event_date' => 'required|date|after:now',
+                'capacity'   => 'nullable|integer|min:1',
+                'is_public'  => 'boolean',
+            ]);
+
+            Log::info('EVENTO: Validación OK', $validated);
+
+            /** @var \App\Models\User $user */
+            $user = Auth::user();
+            Log::info('EVENTO: Usuario autenticado', [
+                'user_id' => $user->user_id
+            ]);
+
+            // PERMISOS: cualquier miembro del grupo puede crear eventos
+            $isAuthorized = $user->groups->contains($validated['group_id']);
+
+            Log::info('EVENTO: ¿Usuario autorizado?', [
+                'authorized' => $isAuthorized,
+                'user_groups' => $user->groups->pluck('group_id')
+            ]);
+
+            if (!$isAuthorized) {
+                Log::warning('EVENTO: Usuario NO autorizado para crear eventos en este grupo');
+                return back()->with('error', 'Debes ser miembro del grupo para crear eventos.');
+            }
+
+            Log::info('EVENTO: Creando evento...');
+
+            $event = Event::create([
+                'group_id'   => $validated['group_id'],
+                'title'      => $validated['title'],
+                'location'   => $validated['location'],
+                'event_date' => Carbon::parse($validated['event_date']),
+                'sport_name' => $validated['sport'],
+                'is_public'  => $validated['is_public'] ?? false,
+                'capacity'   => $validated['capacity'] ?? 0,
+                'creator_id' => $user->user_id,
+            ]);
+
+            Log::info('EVENTO: Evento creado correctamente', [
+                'event_id' => $event->event_id
+            ]);
+
+            Log::info('EVENTO: Registrando asistencia automática del creador...');
+            $event->attendees()->attach($user->user_id, [
+                'is_confirmed' => true,
+                'confirmation_date' => now(),
+            ]);
+
+            Log::info('EVENTO: Asistencia registrada correctamente');
+
+            Log::info('EVENTO: Redirigiendo a event.show', [
+                'route' => route('event.show', $event->event_id)
+            ]);
+
+            return redirect()->route('event.show', $event->event_id)
+                ->with('success', 'Evento creado correctamente.');
+        } catch (\Throwable $e) {
+
+            Log::error('EVENTO: ERROR EN STORE()', [
+                'error' => $e->getMessage(),
+                'line' => $e->getLine(),
+                'file' => $e->getFile(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            throw $e; // para ver el error en pantalla si estás en local
+        }
+    }
+
+
 
 
     /**
