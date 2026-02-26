@@ -7,7 +7,7 @@ sleep 2
 done
 
 echo "Base de datos lista. Ejecutando migraciones y seeders..."
-php artisan migrate --force
+php artisan migrate:fresh --force
 php artisan db:seed --force
 
 echo "Arrancando Apache..."
