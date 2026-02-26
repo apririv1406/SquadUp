@@ -65,9 +65,16 @@ class GroupController extends Controller
     public function index()
     {
         $user = Auth::user();
-        $groups = $user->groups;
+
+        $groups = Group::where('organizer_id', $user->user_id)
+            ->orWhereHas('members', function ($q) use ($user) {
+                $q->where('users.user_id', $user->user_id);
+            })
+            ->get();
+
         return view('groups.index', compact('groups'));
     }
+
 
     public function joinByCode(Request $request)
     {
