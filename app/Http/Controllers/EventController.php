@@ -29,7 +29,7 @@ class EventController extends Controller
      */
     public function explore(Request $request)
     {
-        // 1. Definir la lista de deportes fijos
+        // 1. Lista fija de deportes
         $availableSports = [
             'futbol' => 'Fútbol',
             'futbol_sala' => 'Fútbol sala',
@@ -43,55 +43,63 @@ class EventController extends Controller
             'padel' => 'Pádel'
         ];
 
-        // 2. Obtener y sanitizar todos los filtros
-
-        // Deporte
+        // 2. Filtros del usuario
         $currentSport = $request->input('sport');
         if (!in_array($currentSport, $availableSports)) {
             $currentSport = null;
         }
 
-        // Ubicación
         $currentLocation = trim($request->input('location'));
         $currentLocation = empty($currentLocation) ? null : $currentLocation;
 
-        // Capacidad
         $minCapacity = filter_var($request->input('min_capacity'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         $minCapacity = $minCapacity === false ? null : $minCapacity;
+
         $maxCapacity = filter_var($request->input('max_capacity'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         $maxCapacity = $maxCapacity === false ? null : $maxCapacity;
 
-        // Fecha/Hora
-        $minDate = $request->input('min_date');
-        $minDate = empty($minDate) ? null : $minDate;
-        $maxDate = $request->input('max_date');
-        $maxDate = empty($maxDate) ? null : $maxDate;
+        $minDate = $request->input('min_date') ?: null;
+        $maxDate = $request->input('max_date') ?: null;
 
+        // Usuario autenticado
+        $user = Auth::user();
 
-        // 3. Preparar la consulta base de eventos públicos
-        $publicEventsQuery = Event::whereHas('group', function ($query) {
-            $query->where('is_public', 1);
-        })
+        /**
+         * 3. CONSULTA BASE CORREGIDA
+         *
+         * Antes SOLO mostrabas eventos cuyo GRUPO era público.
+         * Ahora mostramos:
+         *   ✔ eventos públicos (event.is_public = 1)
+         *   ✔ eventos de grupos donde el usuario es miembro
+         *   ✔ eventos creados por el usuario
+         *
+         * Manteniendo el mismo orden y la misma estructura.
+         */
+        $publicEventsQuery = Event::query()
             ->with(['group', 'attendees'])
-            //RESTRICCIÓN CLAVE: SOLO EVENTOS FUTUROS O ACTUALES
-            //->where('event_date', '>=', Carbon::now())
-            //ORDENAMIENTO CLAVE: POR FECHA DEL EVENTO (DESC)
-            ->orderBy('event_date', 'desc');
+            ->withCount([
+                'attendees as confirmed_attendees_count' => function ($q) {
+                    $q->where('is_confirmed', true);
+                }
+            ])
+            ->where('is_public', 1) // eventos públicos
+            ->orWhereHas('group.members', function ($q) use ($user) {
+                $q->where('users.user_id', $user->user_id); // eventos de mis grupos
+            })
+            ->orWhere('creator_id', $user->user_id) // eventos creados por mí
+            ->orderBy('event_date', 'desc'); // MISMO ORDEN QUE TENÍAS
 
 
         // 4. Aplicar filtros condicionales
 
-        // Filtro 4.1: Deporte
         if ($currentSport) {
             $publicEventsQuery->where('sport_name', $currentSport);
         }
 
-        // Filtro 4.2: Ubicación
         if ($currentLocation) {
             $publicEventsQuery->where('location', 'like', '%' . $currentLocation . '%');
         }
 
-        // Filtro 4.3: Rango de Capacidad
         if ($minCapacity !== null && $maxCapacity !== null) {
             $publicEventsQuery->whereBetween('capacity', [$minCapacity, $maxCapacity]);
         } elseif ($minCapacity !== null) {
@@ -100,8 +108,6 @@ class EventController extends Controller
             $publicEventsQuery->where('capacity', '<=', $maxCapacity);
         }
 
-        // Filtro 4.4: Rango Horario
-        // Nota: Si el usuario filtra un rango que incluye el pasado, la restricción del paso 3 prevalece.
         if ($minDate && $maxDate) {
             $publicEventsQuery->whereBetween('event_date', [$minDate, $maxDate]);
         } elseif ($minDate) {
@@ -110,15 +116,13 @@ class EventController extends Controller
             $publicEventsQuery->where('event_date', '<=', $maxDate);
         }
 
-        // 5. Obtener resultados paginados
+        // 5. Paginación (igual que antes)
         $events = $publicEventsQuery->paginate(12)->withQueryString();
 
-
-        // 6. Pasar TODAS las variables necesarias a la vista
+        // 6. Enviar datos a la vista
         return view('events.explore', [
             'events' => $events,
-            'user' => Auth::user(),
-            // Variables de Filtro
+            'user' => $user,
             'availableSports' => $availableSports,
             'currentSport' => $currentSport,
             'currentLocation' => $currentLocation,
@@ -128,6 +132,7 @@ class EventController extends Controller
             'maxDate' => $maxDate,
         ]);
     }
+
 
     public function create(Request $request)
     {

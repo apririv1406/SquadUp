@@ -70,6 +70,11 @@ Route::get('/debug-usergroups-data', function () {
     return DB::table('user_group')->get();
 });
 
+Route::get('/debug-event-data', function () {
+    return DB::table('event')->get();
+});
+
+
 
 // Rutas de Socialite (Autenticación con Google)
 Route::get('login/auth/google/redirect', [SocialiteController::class, 'redirect'])->name('socialite.redirect');
