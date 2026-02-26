@@ -18,7 +18,6 @@ class UsersSeeder extends Seeder
                 'name'      => 'Admin Demo',
                 'password'  => Hash::make('admin123'),
                 'google_id' => null,
-                'created_at'=> now(),
             ]
         );
 
@@ -30,7 +29,6 @@ class UsersSeeder extends Seeder
                 'name'      => 'Miembro Demo',
                 'password'  => Hash::make('member123'),
                 'google_id' => null,
-                'created_at'=> now(),
             ]
         );
     }
