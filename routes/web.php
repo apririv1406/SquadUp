@@ -71,7 +71,7 @@ Route::get('/debug-usergroups-data', function () {
 });
 
 Route::get('/debug-event-data', function () {
-    return DB::table('event')->get();
+    return DB::table('events')->get();
 });
 
 
