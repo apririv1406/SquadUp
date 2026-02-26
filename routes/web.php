@@ -66,6 +66,10 @@ Route::get('/debug-usergroups-columns', function () {
     ");
 });
 
+Route::get('/debug-usergroups-data', function () {
+    return DB::table('user_group')->get();
+});
+
 
 // Rutas de Socialite (Autenticación con Google)
 Route::get('login/auth/google/redirect', [SocialiteController::class, 'redirect'])->name('socialite.redirect');
