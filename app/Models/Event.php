@@ -36,6 +36,7 @@ class Event extends Model
         'event_date',
         'is_public',
         'capacity',
+        'creator_id'
     ];
 
     /**
