@@ -221,7 +221,6 @@ class EventController extends Controller
         Log::info('EVENTO: Entrando al método store()', [
             'input' => $request->all()
         ]);
-
         try {
 
             $availableSports = [
@@ -237,6 +236,9 @@ class EventController extends Controller
                 'padel'
             ];
 
+
+            /** @var \App\Models\User $user */
+            $user = Auth::user();
             Log::info('EVENTO: Iniciando validación...');
 
             // Convertir checkbox "on" a boolean real
@@ -252,6 +254,7 @@ class EventController extends Controller
                 'event_date' => 'required|date|after:now',
                 'capacity'   => 'nullable|integer|min:1',
                 'is_public'  => 'boolean',
+                'creator_id' => $user->user_id,
             ]);
 
 
@@ -503,7 +506,6 @@ class EventController extends Controller
         if (!$isAuthorized) {
             return back()->with('error', 'No tienes permiso para editar este evento.');
         }
-
 
         // Reglas de validación
         $validated = $request->validate([
