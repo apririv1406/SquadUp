@@ -253,8 +253,7 @@ class EventController extends Controller
                 'location'   => 'required|string|max:255',
                 'event_date' => 'required|date|after:now',
                 'capacity'   => 'nullable|integer|min:1',
-                'is_public'  => 'boolean',
-                'creator_id' => $user->user_id,
+                'is_public'  => 'boolean'
             ]);
 
 
