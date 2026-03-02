@@ -4,6 +4,9 @@ FROM php:8.2-apache
 RUN apt-get update && apt-get install -y \
     libpq-dev \
     zip unzip \
+    curl \
+    git \
+    nodejs npm \
     && docker-php-ext-install pdo pdo_pgsql
 
 # Habilitar mod_rewrite
@@ -19,15 +22,20 @@ RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' \
 # Copiar proyecto
 COPY . /var/www/html
 
+WORKDIR /var/www/html
+
 # Instalar Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-WORKDIR /var/www/html
-
+# Instalar dependencias PHP
 RUN composer install --no-dev --optimize-autoloader
 
+# Instalar dependencias JS y compilar Vite
+RUN npm install
+RUN npm run build
+
 # Permisos
-RUN chown -R www-data:www-data storage bootstrap/cache
+RUN chown -R www-data:www-data storage bootstrap/cache public/build
 
 # Copiar entrypoint
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
