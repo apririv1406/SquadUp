@@ -154,21 +154,23 @@
 
                 {{-- Botón dinámico de asistencia --}}
                 @if(!$event->isExpired())
-                <button id="attendance-button"
-                    data-event-id="{{ $event->event_id }}"
-                    class="btn btn-lg fw-bold shadow-sm rounded-pill d-flex align-items-center justify-content-center {{ $isAttending ? 'btn-custom-red' : 'btn-custom-green' }}"
-                    type="button">
-                    @if ($isAttending)
-                    <i class="bi bi-x-circle me-1"></i> Salir del Evento
-                    @else
-                    <i class="bi bi-person-add me-1"></i> Confirmar asistencia
-                    @endif
-                </button>
+                @if ($isAttending)
+                <form action="{{ route('event.leave', $event->event_id) }}" method="POST">
+                    @csrf
+                    <button class="btn btn-lg fw-bold shadow-sm rounded-pill btn-custom-red">
+                        <i class="bi bi-x-circle me-1"></i> Salir del Evento
+                    </button>
+                </form>
                 @else
-                <button class="btn btn-secondary btn-lg fw-bold shadow-sm rounded-pill d-flex align-items-center justify-content-center" type="button" disabled>
-                    <i class="bi bi-calendar-x me-1"></i> Evento vencido
-                </button>
+                <form action="{{ route('event.join', $event->event_id) }}" method="POST">
+                    @csrf
+                    <button class="btn btn-lg fw-bold shadow-sm rounded-pill btn-custom-green">
+                        <i class="bi bi-person-add me-1"></i> Confirmar asistencia
+                    </button>
+                </form>
                 @endif
+                @endif
+
                 @endauth
 
                 @guest

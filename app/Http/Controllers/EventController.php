@@ -588,10 +588,9 @@ class EventController extends Controller
             ]);
         }
 
-        return response()->json([
-            'attending' => true,
-            'attendeeCount' => $event->attendees()->count(),
-        ]);
+        return redirect()
+            ->route('event.show', $event->event_id)
+            ->with('success', 'Asistencia confirmada correctamente.');
     }
 
     /**
@@ -620,7 +619,9 @@ class EventController extends Controller
         // detach acepta int o array de ints
         $event->attendees()->detach($userId);
 
-        return response()->json(['attending' => false, 'user_id' => $userId]);
+        return redirect()
+            ->route('events.explore')
+            ->with('success', 'Has salido del evento correctamente.');
     }
 
     // =======================================================
