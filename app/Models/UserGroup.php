@@ -7,6 +7,9 @@ use Illuminate\Database\Eloquent\Model;
 class UserGroup extends Model
 {
     protected $table = 'user_group';
+    protected $primaryKey = null;
+    public $incrementing = false;
+
 
     public $timestamps = false;
 
