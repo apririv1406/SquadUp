@@ -83,6 +83,18 @@ Route::get('/debug-events-columns', function () {
     ");
 });
 
+Route::get('/fix-user-sequence', function () {
+    DB::statement("
+        SELECT setval(
+            'users_user_id_seq',
+            (SELECT COALESCE(MAX(user_id), 1) FROM users)
+        );
+    ");
+
+    return 'Secuencia corregida correctamente';
+});
+
+
 Route::get('/debug/logs', function () {
     return nl2br(file_get_contents(storage_path('logs/laravel.log')));
 });
