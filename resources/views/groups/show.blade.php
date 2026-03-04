@@ -117,7 +117,7 @@
                                     {{ $event->location ?: 'Ubicación no definida' }}
                                 </p>
 
-                                <a href="#" class="btn btn-outline-success btn-sm rounded-pill w-100">
+                                <a href="{{ route('event.show', $event->event_id) }}" class="btn btn-outline-success btn-sm rounded-pill w-100">
                                     Ver Detalles
                                 </a>
 

@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Auth;
 
 use Illuminate\Support\Facades\DB;
 
-Route::get('/debug-users', function () {
+/*Route::get('/debug-users', function () {
     return DB::select("
         SELECT column_name, data_type, is_nullable
         FROM information_schema.columns
@@ -97,7 +97,7 @@ Route::get('/fix-user-sequence', function () {
 
 Route::get('/debug/logs', function () {
     return nl2br(file_get_contents(storage_path('logs/laravel.log')));
-});
+});*/
 
 
 
