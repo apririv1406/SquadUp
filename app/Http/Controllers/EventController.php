@@ -65,15 +65,13 @@ class EventController extends Controller
         $user = Auth::user();
 
         /**
-         * 3. CONSULTA BASE CORREGIDA
+         * 3. CONSULTA BASE
          *
          * Antes SOLO mostrabas eventos cuyo GRUPO era público.
          * Ahora mostramos:
-         *   ✔ eventos públicos (event.is_public = 1)
-         *   ✔ eventos de grupos donde el usuario es miembro
-         *   ✔ eventos creados por el usuario
-         *
-         * Manteniendo el mismo orden y la misma estructura.
+         *   eventos públicos (event.is_public = 1)
+         *   eventos de grupos donde el usuario es miembro
+         *   eventos creados por el usuario
          */
         $publicEventsQuery = Event::query()
             ->with(['group', 'attendees'])
@@ -82,12 +80,15 @@ class EventController extends Controller
                     $q->where('is_confirmed', true);
                 }
             ])
-            ->where('is_public', 1) // eventos públicos
-            ->orWhereHas('group.members', function ($q) use ($user) {
-                $q->where('users.user_id', $user->user_id); // eventos de mis grupos
+            ->where(function ($query) use ($user) {
+                $query->where('is_public', 1)
+                    ->orWhereHas('group.members', function ($q) use ($user) {
+                        $q->where('users.user_id', $user->user_id);
+                    })
+                    ->orWhere('creator_id', $user->user_id);
             })
-            ->orWhere('creator_id', $user->user_id) // eventos creados por mí
-            ->orderBy('event_date', 'desc'); // MISMO ORDEN QUE TENÍAS
+            ->orderBy('event_date', 'desc');
+
 
 
         // 4. Aplicar filtros condicionales

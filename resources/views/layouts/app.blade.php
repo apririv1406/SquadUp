@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -9,7 +10,7 @@
     <link rel="icon" type="image/png" href="{{ asset('images/logo.ico') }}" alt="SquadUp Logo"">
 
     {{-- Bootstrap CSS --}}
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href=" https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
     {{-- Bootstrap Icons --}}
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
@@ -17,7 +18,8 @@
     {{-- Estilos Personalizados para la Navegación Vertical --}}
     <style>
         :root {
-            --sidebar-width: 280px; /* Ancho de la barra lateral */
+            --sidebar-width: 280px;
+            /* Ancho de la barra lateral */
         }
 
         .sidebar {
@@ -28,13 +30,15 @@
             left: 0;
             z-index: 1000;
             padding: 1rem;
-            background-color: #212529; /* Fondo oscuro (Dark) */
+            background-color: #212529;
+            /* Fondo oscuro (Dark) */
         }
 
         .main-content {
             margin-left: var(--sidebar-width);
             padding: 1.5rem;
-            background-color: #f8f9fa; /* Fondo claro para el contenido */
+            background-color: #f8f9fa;
+            /* Fondo claro para el contenido */
             min-height: 100vh;
         }
 
@@ -45,6 +49,7 @@
                 height: auto;
                 position: relative;
             }
+
             .main-content {
                 margin-left: 0;
             }
@@ -52,18 +57,30 @@
     </style>
 </head>
 {{-- 1. SOLUCIÓN ROBUSTA: Pasamos la ruta 'home' a un atributo de datos en el body --}}
+
 <body @auth data-home-route="{{ route('dashboard') }}" @endauth>
     @auth
-        {{-- Incluye la barra lateral: layouts.navigation --}}
-        @include('layouts.navigation')
+    {{-- Incluye la barra lateral: layouts.navigation --}}
+    @include('layouts.navigation')
 
-        {{-- Contenido principal --}}
-        <div class="main-content">
-            @yield('content')
+    {{-- Contenido principal --}}
+    <div class="main-content">
+
+        {{-- Botón de volver atrás --}}
+        @if (!request()->is('dashboard'))
+        <div class="mb-3">
+            <a href="{{ url()->previous() }}" class="text-primary text-decoration-none">
+                <i class="bi bi-arrow-left"></i> Volver atrás
+            </a>
         </div>
-    @else
-        {{-- Si no está autenticado (Login/Register), muestra solo el contenido --}}
+        @endif
+
         @yield('content')
+    </div>
+
+    @else
+    {{-- Si no está autenticado (Login/Register), muestra solo el contenido --}}
+    @yield('content')
     @endauth
 
     {{-- Bootstrap JS --}}
@@ -96,4 +113,5 @@
         });
     </script>
 </body>
+
 </html>
