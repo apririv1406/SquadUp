@@ -7,19 +7,17 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <title>SquadUp | @yield('title', 'El Deporte sin Deudas')</title>
-    <link rel="icon" type="image/png" href="{{ asset('images/logo.ico') }}" alt="SquadUp Logo"">
+    <link rel="icon" type="image/png" href="{{ asset('images/logo.ico') }}" alt="SquadUp Logo">
 
     {{-- Bootstrap CSS --}}
-    <link href=" https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
     {{-- Bootstrap Icons --}}
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
-    {{-- Estilos Personalizados para la Navegación Vertical --}}
     <style>
         :root {
             --sidebar-width: 280px;
-            /* Ancho de la barra lateral */
         }
 
         .sidebar {
@@ -31,114 +29,90 @@
             z-index: 1000;
             padding: 1rem;
             background-color: #212529;
-            /* Fondo oscuro (Dark) */
         }
-
 
         .main-content {
             margin-left: var(--sidebar-width);
             padding: 1.5rem;
             background-color: #f8f9fa;
-            /* Fondo claro para el contenido */
             min-height: 100vh;
         }
 
-        /* Ajuste para pantallas pequeñas (móvil/tablet) */
+        /* RESPONSIVE */
         @media (max-width: 992px) {
+
+            /* Sidebar oculta por defecto */
             .sidebar {
+                display: none;
+                position: absolute;
                 width: 100%;
                 height: auto;
-                position: relative;
-                display: none;
-                /* ← añadido */
+                z-index: 2000;
             }
 
+            /* Sidebar visible al activar */
             .sidebar.active {
                 display: block;
-                /* ← añadido */
             }
 
+            /* Contenido ocupa todo el ancho */
             .main-content {
                 margin-left: 0;
+            }
+
+            /* Botón hamburguesa visible */
+            #toggleSidebar {
+                position: relative;
+                z-index: 3000;
             }
         }
     </style>
 </head>
-{{-- 1. SOLUCIÓN ROBUSTA: Pasamos la ruta 'home' a un atributo de datos en el body --}}
 
 <body @auth data-home-route="{{ route('dashboard') }}" @endauth>
-    @auth
-    {{-- Incluye la barra lateral: layouts.navigation --}}
-    @include('layouts.navigation')
 
-    {{-- Botón hamburguesa SOLO en móvil --}}
-    <button class="btn btn-dark d-lg-none mb-3" id="toggleSidebar">
+@auth
+
+    {{-- BOTÓN HAMBURGUESA (ANTES DE LA SIDEBAR) --}}
+    <button class="btn btn-dark d-lg-none m-3" id="toggleSidebar">
         <i class="bi bi-list"></i> Menú
     </button>
 
-    {{-- Contenido principal --}}
+    {{-- SIDEBAR --}}
+    @include('layouts.navigation')
+
+    {{-- CONTENIDO PRINCIPAL --}}
     <div class="main-content">
 
-        {{-- Botón de volver atrás --}}
         @if (!request()->is('dashboard'))
-        <div class="mb-3">
-            <a href="{{ url()->previous() }}" class="text-primary text-decoration-none">
-                <i class="bi bi-arrow-left"></i> Volver atrás
-            </a>
-        </div>
+            <div class="mb-3">
+                <a href="{{ url()->previous() }}" class="text-primary text-decoration-none">
+                    <i class="bi bi-arrow-left"></i> Volver atrás
+                </a>
+            </div>
         @endif
 
         @yield('content')
     </div>
 
-    @else
-    {{-- Si no está autenticado (Login/Register), muestra solo el contenido --}}
+@else
     @yield('content')
-    @endauth
+@endauth
 
-    {{-- Bootstrap JS --}}
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
-    {{-- 2. SCRIPT DE RESALTADO ACTIVO --}}
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Leemos la ruta Home del atributo data-home-route (SOLUCIÓN al error de linter)
-            const homeRouteUrl = document.body.dataset.homeRoute;
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const toggleBtn = document.getElementById('toggleSidebar');
+    const sidebar = document.querySelector('.sidebar');
 
-            // Obtiene la URL actual, eliminando parámetros de consulta
-            const currentUrl = window.location.href.split('?')[0];
-
-            document.querySelectorAll('.nav-link').forEach(link => {
-                const linkHref = link.getAttribute('href');
-
-                // Compara el href del enlace con la URL actual
-                if (linkHref === currentUrl) {
-                    link.classList.add('active');
-                    return;
-                }
-
-                // Caso especial para el dashboard (Home):
-                if (linkHref === homeRouteUrl && currentUrl === homeRouteUrl) {
-                    link.classList.add('active');
-                    return;
-                }
-            });
+    if (toggleBtn && sidebar) {
+        toggleBtn.addEventListener('click', function () {
+            sidebar.classList.toggle('active');
         });
-    </script>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const toggleBtn = document.getElementById('toggleSidebar');
-            const sidebar = document.querySelector('.sidebar');
-
-            if (toggleBtn && sidebar) {
-                toggleBtn.addEventListener('click', function() {
-                    sidebar.classList.toggle('active');
-                });
-            }
-        });
-    </script>
+    }
+});
+</script>
 
 </body>
-
 </html>
