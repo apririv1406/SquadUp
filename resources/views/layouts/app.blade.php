@@ -34,6 +34,7 @@
             /* Fondo oscuro (Dark) */
         }
 
+
         .main-content {
             margin-left: var(--sidebar-width);
             padding: 1.5rem;
@@ -48,6 +49,13 @@
                 width: 100%;
                 height: auto;
                 position: relative;
+                display: none;
+                /* ← añadido */
+            }
+
+            .sidebar.active {
+                display: block;
+                /* ← añadido */
             }
 
             .main-content {
@@ -62,6 +70,11 @@
     @auth
     {{-- Incluye la barra lateral: layouts.navigation --}}
     @include('layouts.navigation')
+
+    {{-- Botón hamburguesa SOLO en móvil --}}
+    <button class="btn btn-dark d-lg-none mb-3" id="toggleSidebar">
+        <i class="bi bi-list"></i> Menú
+    </button>
 
     {{-- Contenido principal --}}
     <div class="main-content">
@@ -112,6 +125,20 @@
             });
         });
     </script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const toggleBtn = document.getElementById('toggleSidebar');
+            const sidebar = document.querySelector('.sidebar');
+
+            if (toggleBtn && sidebar) {
+                toggleBtn.addEventListener('click', function() {
+                    sidebar.classList.toggle('active');
+                });
+            }
+        });
+    </script>
+
 </body>
 
 </html>
