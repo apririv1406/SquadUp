@@ -23,103 +23,103 @@ class EventController extends Controller
         Group::ROLE_ORGANIZER
     ];
 
-   public function explore(Request $request)
-{
-    // 1. Lista fija de deportes
-    $availableSports = [
-        'futbol' => 'Fútbol',
-        'futbol_sala' => 'Fútbol sala',
-        'baloncesto' => 'Baloncesto',
-        'balonmano' => 'Balonmano',
-        'waterpolo' => 'Waterpolo',
-        'tenis' => 'Tenis',
-        'voley' => 'Voleibol',
-        'running' => 'Running / Carrera',
-        'senderismo' => 'Senderismo',
-        'padel' => 'Pádel'
-    ];
+    public function explore(Request $request)
+    {
+        // 1. Lista fija de deportes
+        $availableSports = [
+            'futbol' => 'Fútbol',
+            'futbol_sala' => 'Fútbol sala',
+            'baloncesto' => 'Baloncesto',
+            'balonmano' => 'Balonmano',
+            'waterpolo' => 'Waterpolo',
+            'tenis' => 'Tenis',
+            'voley' => 'Voleibol',
+            'running' => 'Running / Carrera',
+            'senderismo' => 'Senderismo',
+            'padel' => 'Pádel'
+        ];
 
-    // 2. Filtros del usuario
-    $currentSport = $request->input('sport');
-    if (!array_key_exists($currentSport, $availableSports)) {
-        $currentSport = null;
+        // 2. Filtros del usuario
+        $currentSport = $request->input('sport');
+        if (!array_key_exists($currentSport, $availableSports)) {
+            $currentSport = null;
+        }
+
+        $currentLocation = trim($request->input('location'));
+        $currentLocation = empty($currentLocation) ? null : $currentLocation;
+
+        $minCapacity = filter_var($request->input('min_capacity'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $minCapacity = $minCapacity === false ? null : $minCapacity;
+
+        $maxCapacity = filter_var($request->input('max_capacity'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $maxCapacity = $maxCapacity === false ? null : $maxCapacity;
+
+        $minDate = $request->input('min_date') ?: null;
+        $maxDate = $request->input('max_date') ?: null;
+
+        // Usuario autenticado
+        $user = Auth::user();
+
+        // 3. CONSULTA
+        $publicEventsQuery = Event::query()
+            ->with(['group', 'attendees'])
+            ->withCount([
+                'attendees as confirmed_attendees_count' => function ($q) {
+                    $q->where('is_confirmed', true);
+                }
+            ])
+            ->where(function ($query) use ($user) {
+                $query->where('is_public', 1)
+                    ->orWhereHas('group.members', function ($q) use ($user) {
+                        $q->where('users.user_id', $user->user_id);
+                    })
+                    ->orWhere('creator_id', $user->user_id);
+            });
+
+        // 4. Aplicar filtros condicionales
+        if ($currentSport) {
+            $publicEventsQuery->where('sport_name', $currentSport);
+        }
+
+        if ($currentLocation) {
+            $publicEventsQuery->where('location', 'like', '%' . $currentLocation . '%');
+        }
+
+        if ($minCapacity !== null && $maxCapacity !== null) {
+            $publicEventsQuery->whereBetween('capacity', [$minCapacity, $maxCapacity]);
+        } elseif ($minCapacity !== null) {
+            $publicEventsQuery->where('capacity', '>=', $minCapacity);
+        } elseif ($maxCapacity !== null) {
+            $publicEventsQuery->where('capacity', '<=', $maxCapacity);
+        }
+
+        if ($minDate && $maxDate) {
+            $publicEventsQuery->whereBetween('event_date', [$minDate, $maxDate]);
+        } elseif ($minDate) {
+            $publicEventsQuery->where('event_date', '>=', $minDate);
+        } elseif ($maxDate) {
+            $publicEventsQuery->where('event_date', '<=', $maxDate);
+        }
+
+        // 5. Orden y paginación
+        $events = $publicEventsQuery
+            ->orderBy('event_date', 'asc')
+            ->paginate(12)
+            ->withQueryString();
+
+        // 6. Enviar datos a la vista
+        return view('events.explore', [
+            'events' => $events,
+            'user' => $user,
+            'availableSports' => $availableSports,
+            'currentSport' => $currentSport,
+            'currentLocation' => $currentLocation,
+            'minCapacity' => $minCapacity,
+            'maxCapacity' => $maxCapacity,
+            'minDate' => $minDate,
+            'maxDate' => $maxDate,
+        ]);
     }
-
-    $currentLocation = trim($request->input('location'));
-    $currentLocation = empty($currentLocation) ? null : $currentLocation;
-
-    $minCapacity = filter_var($request->input('min_capacity'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-    $minCapacity = $minCapacity === false ? null : $minCapacity;
-
-    $maxCapacity = filter_var($request->input('max_capacity'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-    $maxCapacity = $maxCapacity === false ? null : $maxCapacity;
-
-    $minDate = $request->input('min_date') ?: null;
-    $maxDate = $request->input('max_date') ?: null;
-
-    // Usuario autenticado
-    $user = Auth::user();
-
-    // 3. CONSULTA BASE CORREGIDA
-    $publicEventsQuery = Event::query()
-        ->with(['group', 'attendees'])
-        ->withCount([
-            'attendees as confirmed_attendees_count' => function ($q) {
-                $q->where('is_confirmed', true);
-            }
-        ])
-        ->where(function ($query) use ($user) {
-            $query->where('is_public', 1)
-                  ->orWhereHas('group.members', function ($q) use ($user) {
-                      $q->where('users.user_id', $user->user_id);
-                  })
-                  ->orWhere('creator_id', $user->user_id);
-        });
-
-    // 4. Aplicar filtros condicionales
-    if ($currentSport) {
-        $publicEventsQuery->where('sport_name', $currentSport);
-    }
-
-    if ($currentLocation) {
-        $publicEventsQuery->where('location', 'like', '%' . $currentLocation . '%');
-    }
-
-    if ($minCapacity !== null && $maxCapacity !== null) {
-        $publicEventsQuery->whereBetween('capacity', [$minCapacity, $maxCapacity]);
-    } elseif ($minCapacity !== null) {
-        $publicEventsQuery->where('capacity', '>=', $minCapacity);
-    } elseif ($maxCapacity !== null) {
-        $publicEventsQuery->where('capacity', '<=', $maxCapacity);
-    }
-
-    if ($minDate && $maxDate) {
-        $publicEventsQuery->whereBetween('event_date', [$minDate, $maxDate]);
-    } elseif ($minDate) {
-        $publicEventsQuery->where('event_date', '>=', $minDate);
-    } elseif ($maxDate) {
-        $publicEventsQuery->where('event_date', '<=', $maxDate);
-    }
-
-    // 5. Orden y paginación
-    $events = $publicEventsQuery
-        ->orderBy('event_date', 'asc')
-        ->paginate(12)
-        ->withQueryString();
-
-    // 6. Enviar datos a la vista
-    return view('events.explore', [
-        'events' => $events,
-        'user' => $user,
-        'availableSports' => $availableSports,
-        'currentSport' => $currentSport,
-        'currentLocation' => $currentLocation,
-        'minCapacity' => $minCapacity,
-        'maxCapacity' => $maxCapacity,
-        'minDate' => $minDate,
-        'maxDate' => $maxDate,
-    ]);
-}
 
 
 
