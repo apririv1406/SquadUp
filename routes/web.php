@@ -94,10 +94,10 @@ Route::get('/fix-user-sequence', function () {
     return 'Secuencia corregida correctamente';
 });
 
-
+*/
 Route::get('/debug/logs', function () {
     return nl2br(file_get_contents(storage_path('logs/laravel.log')));
-});*/
+});
 
 
 
