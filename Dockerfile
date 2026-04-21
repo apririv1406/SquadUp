@@ -19,10 +19,13 @@ RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' \
     /etc/apache2/sites-available/000-default.conf \
     /etc/apache2/apache2.conf
 
-# Copiar proyecto
+# Copiar proyecto (sin .env si usas .dockerignore)
 COPY . /var/www/html
 
 WORKDIR /var/www/html
+
+# Eliminar .env si se coló
+RUN rm -f /var/www/html/.env
 
 # Instalar Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
