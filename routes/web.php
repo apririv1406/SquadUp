@@ -98,6 +98,14 @@ Route::get('/fix-user-sequence', function () {
 Route::get('/debug/logs', function () {
     return nl2br(file_get_contents(storage_path('logs/laravel.log')));
 });
+Route::get('/debug-env', function () {
+    return [
+        'DB_HOST' => env('DB_HOST'),
+        'DB_DATABASE' => env('DB_DATABASE'),
+        'DB_USERNAME' => env('DB_USERNAME'),
+        'DB_PASSWORD' => env('DB_PASSWORD') ? 'SET' : 'EMPTY',
+    ];
+});
 
 
 
